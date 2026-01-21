@@ -11,6 +11,10 @@ on:
         required: false
         default: ''
 
+# 添加写入权限
+permissions:
+  contents: write
+
 env:
   CARGO_INCREMENTAL: 0
 
@@ -25,13 +29,13 @@ jobs:
             target: x86_64-pc-windows-msvc
             os_name: windows
 
-          # macOS Intel
-          - platform: macos-13
+          # macOS Intel (使用 macos-14 + x86_64 target)
+          - platform: macos-14
             target: x86_64-apple-darwin
             os_name: macos-intel
 
           # macOS Apple Silicon
-          - platform: macos-latest
+          - platform: macos-14
             target: aarch64-apple-darwin
             os_name: macos-arm
 
@@ -59,11 +63,11 @@ jobs:
             libudev-dev \
             libusb-1.0-0-dev
 
-      # macOS 依赖 (probe-rs 需要)
-      - name: Install macOS dependencies
-        if: runner.os == 'macOS'
+      # macOS Intel 需要安装 Rosetta 和 x86_64 工具链
+      - name: Setup macOS Intel build
+        if: matrix.os_name == 'macos-intel'
         run: |
-          brew install libusb
+          softwareupdate --install-rosetta --agree-to-license || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
