@@ -20,15 +20,50 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Windows
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
-            bundles: msi,nsis
+            os_name: windows
+
+          # macOS Intel
+          - platform: macos-13
+            target: x86_64-apple-darwin
+            os_name: macos-intel
+
+          # macOS Apple Silicon
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            os_name: macos-arm
+
+          # Linux x64
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            os_name: linux
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Linux 依赖
+      - name: Install Linux dependencies
+        if: matrix.os_name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libudev-dev \
+            libusb-1.0-0-dev
+
+      # macOS 依赖 (probe-rs 需要)
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install libusb
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -62,6 +97,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          key: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -77,32 +113,23 @@ jobs:
             ## ZUOLAN DAPLINK 烧录工具
 
             ### 下载说明
-            - **Windows安装包**: `ZUOLAN.DAPLINK_*_x64-setup.exe` (NSIS安装程序，推荐)
-            - **Windows MSI**: `ZUOLAN.DAPLINK_*_x64_en-US.msi` (MSI安装包)
+
+            | 平台 | 文件 | 说明 |
+            |------|------|------|
+            | **Windows** | `*_x64-setup.exe` | NSIS安装程序 (推荐) |
+            | **Windows** | `*_x64_en-US.msi` | MSI安装包 |
+            | **macOS (Intel)** | `*_x64.dmg` | Intel芯片Mac |
+            | **macOS (Apple Silicon)** | `*_aarch64.dmg` | M1/M2/M3芯片Mac |
+            | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
+            | **Linux** | `*_amd64.AppImage` | 通用Linux |
 
             ### 系统要求
-            - Windows 10/11 64位
-            - 需要安装 WebView2 运行时（安装程序会自动下载）
+            - **Windows**: Windows 10/11 64位，需要WebView2运行时
+            - **macOS**: macOS 10.15+ (Catalina或更高)
+            - **Linux**: 需要WebKitGTK和libusb
 
             ### 更新日志
             请查看 [CHANGELOG](https://github.com/zuoliangyu/ZUOLANDAPLINK/commits/main)
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
-
-  # 可选：添加Linux和macOS构建
-  # build-linux:
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install dependencies
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
-  #     # ... 其他步骤与Windows类似
-
-  # build-macos:
-  #   runs-on: macos-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     # ... 其他步骤与Windows类似

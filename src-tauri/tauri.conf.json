@@ -35,6 +35,14 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libudev1", "libusb-1.0-0"]
+      }
     }
   },
   "plugins": {}
