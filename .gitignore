@@ -32,3 +32,4 @@ packs/*.pack
 
 # Claude Code
 .claude/
+.spec-workflow/
