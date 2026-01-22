@@ -1,6 +1,6 @@
 [package]
 name = "zuolandaplink"
-version = "0.1.0"
+version = "0.2.0"
 description = "DAPLINK烧录工具"
 authors = ["zuolan"]
 edition = "2021"
