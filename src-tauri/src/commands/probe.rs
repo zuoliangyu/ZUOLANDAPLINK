@@ -2,7 +2,7 @@ use crate::error::{AppError, AppResult};
 use crate::state::{AppState, ConnectionInfo, ConnectMode, InterfaceType};
 use probe_rs::{
     probe::{list::Lister, WireProtocol},
-    Permissions,
+    MemoryInterface, Permissions, Session,
 };
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -22,6 +22,7 @@ pub struct TargetInfo {
     pub core_type: String,
     pub memory_regions: Vec<MemoryRegion>,
     pub flash_algorithms: Vec<String>,
+    pub chip_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +31,32 @@ pub struct MemoryRegion {
     pub kind: String,
     pub address: u64,
     pub size: u64,
+}
+
+/// Try to read the chip IDCODE
+/// Different chip families have different IDCODE register addresses
+fn read_chip_id(session: &mut Session) -> Option<u32> {
+    let mut core = session.core(0).ok()?;
+
+    // Common chip IDCODE address list
+    let id_addresses: &[(u64, &str)] = &[
+        (0xE0042000, "STM32 DBGMCU_IDCODE"),     // Most STM32 chips
+        (0x40015800, "STM32G0/G4 DBG_IDCODE"),   // STM32G0/G4 series
+        (0x1FFFF7E8, "STM32 UID"),               // Backup: Unique ID
+        (0x10000060, "nRF FICR.INFO.PART"),      // Nordic nRF
+        (0x40000FF8, "RP2040 CHIPID"),           // Raspberry Pi RP2040
+    ];
+
+    for (addr, _name) in id_addresses {
+        if let Ok(id) = core.read_word_32(*addr) {
+            // Exclude invalid values
+            if id != 0 && id != 0xFFFFFFFF {
+                return Some(id);
+            }
+        }
+    }
+
+    None
 }
 
 #[tauri::command]
@@ -100,7 +127,7 @@ pub async fn connect_target(
     }
 
     // 连接目标
-    let session = if options.connect_mode == ConnectMode::UnderReset {
+    let mut session = if options.connect_mode == ConnectMode::UnderReset {
         probe
             .attach_under_reset(&options.target, Permissions::default())
             .map_err(|e| AppError::ProbeError(e.to_string()))?
@@ -109,6 +136,9 @@ pub async fn connect_target(
             .attach(&options.target, Permissions::default())
             .map_err(|e| AppError::ProbeError(e.to_string()))?
     };
+
+    // 读取芯片ID
+    let chip_id = read_chip_id(&mut session);
 
     // 获取目标信息
     let target = session.target();
@@ -143,6 +173,7 @@ pub async fn connect_target(
             .iter()
             .map(|a| a.name.clone())
             .collect(),
+        chip_id,
     };
 
     // 存储连接信息
@@ -152,7 +183,7 @@ pub async fn connect_target(
             probe_name: options.probe_identifier.clone(),
             target_name: options.target.clone(),
             core_type: target_info.core_type.clone(),
-            chip_id: None, // TODO: 读取芯片ID
+            chip_id,
         });
     }
 

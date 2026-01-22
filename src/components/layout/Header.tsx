@@ -14,13 +14,20 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProbeStore } from "@/stores/probeStore";
 import { useFlashStore } from "@/stores/flashStore";
 import { useLogStore } from "@/stores/logStore";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { flashFirmware, eraseChip, verifyFirmware, readFlash } from "@/lib/tauri";
 import { listen } from "@tauri-apps/api/event";
-import type { FlashProgressEvent } from "@/lib/types";
+import type { FlashProgressEvent, EraseMode } from "@/lib/types";
 import { useEffect } from "react";
 
 interface ToolbarButtonProps {
@@ -67,6 +74,8 @@ export function Header() {
     setProgress,
     verifyAfterFlash,
     resetAfterFlash,
+    eraseMode,
+    setEraseMode,
   } = useFlashStore();
   const addLog = useLogStore((state) => state.addLog);
 
@@ -128,6 +137,7 @@ export function Header() {
         verify: verifyAfterFlash,
         skip_erase: false,
         reset_after: resetAfterFlash,
+        erase_mode: eraseMode,
       });
 
       addLog("success", "烧录成功");
@@ -146,9 +156,10 @@ export function Header() {
 
     try {
       setFlashing(true);
-      addLog("info", "开始全片擦除");
-      await eraseChip();
-      addLog("success", "全片擦除完成");
+      const modeLabel = eraseMode === "ChipErase" ? "全片擦除" : "扇区擦除";
+      addLog("info", `开始${modeLabel}`);
+      await eraseChip(eraseMode);
+      addLog("success", `${modeLabel}完成`);
     } catch (error) {
       addLog("error", `擦除失败: ${error}`);
     } finally {
@@ -233,6 +244,33 @@ export function Header() {
           label="解锁芯片"
           disabled={!connected || flashing}
         />
+        <ToolbarSeparator />
+
+        {/* 擦除模式选择 */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Select
+                  value={eraseMode}
+                  onValueChange={(value) => setEraseMode(value as EraseMode)}
+                  disabled={flashing}
+                >
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SectorErase">扇区擦除</SelectItem>
+                    <SelectItem value="ChipErase">整片擦除</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>擦除模式：扇区擦除只擦除需要写入的区域，整片擦除会清空整个Flash</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <ToolbarSeparator />
 
         {/* Flash操作 */}

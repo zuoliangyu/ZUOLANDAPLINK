@@ -9,8 +9,11 @@ import type {
   PackInfo,
   ProjectConfig,
   RttConfig,
+  RttStartOptions,
+  RttStatusEvent,
   RegisterValue,
   FlashAlgorithmInfo,
+  EraseMode,
 } from "./types";
 
 // 探针命令
@@ -35,8 +38,8 @@ export async function flashFirmware(options: FlashOptions): Promise<void> {
   return await invoke("flash_firmware", { options });
 }
 
-export async function eraseChip(): Promise<void> {
-  return await invoke("erase_chip");
+export async function eraseChip(eraseMode?: EraseMode): Promise<void> {
+  return await invoke("erase_chip", { options: eraseMode ? { erase_mode: eraseMode } : null });
 }
 
 export async function eraseSector(address: number, size: number): Promise<void> {
@@ -65,20 +68,24 @@ export async function readRegisters(): Promise<RegisterValue[]> {
 }
 
 // RTT命令
-export async function startRtt(): Promise<RttConfig> {
-  return await invoke<RttConfig>("start_rtt");
+export async function startRtt(options: RttStartOptions): Promise<RttConfig> {
+  return await invoke<RttConfig>("start_rtt", { options });
 }
 
 export async function stopRtt(): Promise<void> {
   return await invoke("stop_rtt");
 }
 
-export async function readRtt(channel: number): Promise<number[]> {
-  return await invoke<number[]>("read_rtt", { options: { channel } });
+export async function writeRtt(channel: number, data: number[]): Promise<number> {
+  return await invoke<number>("write_rtt", { channel, data });
 }
 
-export async function writeRtt(channel: number, data: number[]): Promise<number> {
-  return await invoke<number>("write_rtt", { options: { channel, data } });
+export async function getRttStatus(): Promise<RttStatusEvent> {
+  return await invoke<RttStatusEvent>("get_rtt_status");
+}
+
+export async function clearRttBuffer(): Promise<void> {
+  return await invoke("clear_rtt_buffer");
 }
 
 // 配置命令

@@ -38,8 +38,9 @@ pub fn run() {
             // RTT命令
             rtt::start_rtt,
             rtt::stop_rtt,
-            rtt::read_rtt,
             rtt::write_rtt,
+            rtt::get_rtt_status,
+            rtt::clear_rtt_buffer,
             // 配置命令
             config::get_supported_chips,
             config::search_chips,

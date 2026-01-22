@@ -20,6 +20,7 @@ export function Sidebar() {
     probes,
     selectedProbe,
     connected,
+    connectionInfo,
     settings,
     loading,
     setProbes,
@@ -83,7 +84,7 @@ export function Sidebar() {
         probe_name: selectedProbe.identifier,
         target_name: selectedChip,
         core_type: targetInfo.core_type,
-        chip_id: null,
+        chip_id: targetInfo.chip_id,
       }, targetInfo);
 
       addLog("success", `已连接到 ${selectedChip}`);
@@ -320,6 +321,33 @@ export function Sidebar() {
           </>
         )}
       </Button>
+
+      {/* 连接信息 */}
+      {connected && connectionInfo && (
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">连接信息</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">目标:</span>
+              <span>{connectionInfo.target_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">内核:</span>
+              <span>{connectionInfo.core_type}</span>
+            </div>
+            {connectionInfo.chip_id !== null && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">芯片ID:</span>
+                <span className="font-mono">
+                  0x{connectionInfo.chip_id.toString(16).toUpperCase().padStart(8, '0')}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </aside>
   );
 }

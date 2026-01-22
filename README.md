@@ -42,9 +42,11 @@ ZUOLANDAPLINK/
 ├── src/                          # React 前端源码
 │   ├── components/               # UI组件
 │   │   ├── layout/              # 布局组件 (Header, Sidebar, MainArea)
+│   │   ├── rtt/                 # RTT 终端组件
 │   │   ├── log/                 # 日志面板
 │   │   └── ui/                  # 基础UI组件
 │   ├── stores/                  # Zustand 状态管理
+│   ├── hooks/                   # React Hooks
 │   ├── lib/                     # 工具库和类型定义
 │   ├── App.tsx                  # 主应用组件
 │   └── main.tsx                 # 入口文件
@@ -65,6 +67,13 @@ ZUOLANDAPLINK/
 │   ├── icons/                   # 应用图标
 │   ├── Cargo.toml               # Rust依赖
 │   └── tauri.conf.json          # Tauri配置
+├── RTTBSP/                      # SEGGER RTT 库文件（可直接复制到工程）
+│   ├── SEGGER_RTT.c
+│   ├── SEGGER_RTT.h
+│   ├── SEGGER_RTT_Conf.h
+│   └── SEGGER_RTT_printf.c
+├── docs/                        # 文档
+│   └── RTT_USER_MANUAL.md       # RTT 用户手册
 ├── packs/                       # 用户导入的Pack存放目录
 ├── package.json                 # Node.js依赖
 └── README.md                    # 本文件
@@ -149,6 +158,38 @@ pnpm tauri build
 - 当前版本不支持进度回调显示（probe-rs API限制）
 - ESP32系列需要特殊的烧录流程
 - 部分国产芯片可能需要导入对应的Pack
+
+## RTT 使用说明
+
+### 功能特性
+
+- **实时日志输出** - 通过 SWD/JTAG 接口直接读取目标内存，无需额外串口
+- **ANSI 颜色支持** - 支持终端颜色代码，可显示彩色日志
+- **多通道支持** - 支持多个 RTT 上行/下行通道
+- **高速传输** - 比传统 UART 打印快数倍
+- **自动滚动** - 自动滚动到最新日志
+- **搜索过滤** - 支持关键字搜索和通道过滤
+- **数据导出** - 支持导出为 TXT/CSV 格式
+
+### 目标固件要求
+
+RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` 目录提供所需文件，可直接复制到工程中使用。
+
+详细使用方法请参考 **[RTT 用户手册](docs/RTT_USER_MANUAL.md)**。
+
+### CMSIS-DAP 注意事项
+
+使用 CMSIS-DAP/DAPLINK 探针时，RTT 读取需要暂停目标芯片才能安全访问内存。这与 J-Link 不同（J-Link 有硬件加速可以不暂停直接读取）。
+
+**影响：**
+- RTT 读取时目标芯片会被短暂暂停（约 1-2ms），然后恢复运行
+- 对于大多数应用没有明显影响
+- 对于时序敏感的应用（如高速通信、精确定时），可能会有轻微影响
+
+**重要配置：**
+- **必须配置为非阻塞模式**，否则缓冲区满时目标会卡死
+- 轮询间隔默认 10ms，可根据需要调整
+- 如果目标程序对实时性要求极高，建议使用 J-Link 探针
 
 ## 开源协议
 

@@ -22,6 +22,7 @@ export interface TargetInfo {
   core_type: string;
   memory_regions: MemoryRegion[];
   flash_algorithms: string[];
+  chip_id: number | null;
 }
 
 // 内存区域
@@ -76,12 +77,16 @@ export interface FlashAlgorithmInfo {
   data_section_offset: number;
 }
 
+// 擦除模式
+export type EraseMode = "ChipErase" | "SectorErase";
+
 // Flash烧录选项
 export interface FlashOptions {
   file_path: string;
   verify: boolean;
   skip_erase: boolean;
   reset_after: boolean;
+  erase_mode: EraseMode;
 }
 
 // Flash进度事件
@@ -111,16 +116,53 @@ export interface ProjectConfig {
   reset_after_flash: boolean;
 }
 
-// RTT通道
+// RTT 扫描模式
+export type RttScanMode = "auto" | "exact" | "range";
+
+// RTT 启动选项
+export interface RttStartOptions {
+  scan_mode: RttScanMode;
+  address?: number;
+  range_start?: number;
+  range_size?: number;
+  poll_interval?: number;
+  halt_on_read?: boolean; // 是否在读取时暂停目标 (默认 true)
+}
+
+// RTT 通道信息
 export interface RttChannel {
   index: number;
   name: string;
   buffer_size: number;
 }
 
-// RTT配置
+// RTT 配置响应
 export interface RttConfig {
-  channels: RttChannel[];
+  up_channels: RttChannel[];
+  down_channels: RttChannel[];
+  control_block_address: number | null;
+}
+
+// RTT 数据事件 (从后端接收)
+export interface RttDataEvent {
+  channel: number;
+  data: number[];
+  timestamp: number;
+}
+
+// RTT 状态事件
+export interface RttStatusEvent {
+  running: boolean;
+  error: string | null;
+}
+
+// RTT 显示行
+export interface RttLine {
+  id: number;
+  channel: number;
+  timestamp: Date;
+  text: string;
+  level: "info" | "warn" | "error" | "debug";
 }
 
 // 寄存器值

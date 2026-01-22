@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { EraseMode } from "@/lib/types";
 
 interface FlashState {
   // 状态
@@ -10,6 +11,7 @@ interface FlashState {
   message: string;
   verifyAfterFlash: boolean;
   resetAfterFlash: boolean;
+  eraseMode: EraseMode;
 
   // 操作
   setFirmwarePath: (path: string | null) => void;
@@ -18,6 +20,7 @@ interface FlashState {
   setProgress: (progress: number, phase?: string, message?: string) => void;
   setVerifyAfterFlash: (verify: boolean) => void;
   setResetAfterFlash: (reset: boolean) => void;
+  setEraseMode: (mode: EraseMode) => void;
   reset: () => void;
 }
 
@@ -30,6 +33,7 @@ export const useFlashStore = create<FlashState>((set) => ({
   message: "",
   verifyAfterFlash: true,
   resetAfterFlash: true,
+  eraseMode: "SectorErase",
 
   setFirmwarePath: (firmwarePath) => set({ firmwarePath }),
 
@@ -47,6 +51,8 @@ export const useFlashStore = create<FlashState>((set) => ({
   setVerifyAfterFlash: (verifyAfterFlash) => set({ verifyAfterFlash }),
 
   setResetAfterFlash: (resetAfterFlash) => set({ resetAfterFlash }),
+
+  setEraseMode: (eraseMode) => set({ eraseMode }),
 
   reset: () =>
     set({

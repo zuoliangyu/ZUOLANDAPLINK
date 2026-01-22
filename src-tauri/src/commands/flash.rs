@@ -1,10 +1,18 @@
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use probe_rs::flashing::{download_file, erase_all, FlashProgress, Format, DownloadOptions, BinOptions};
+use probe_rs::flashing::{download_file_with_options, erase_all, FlashProgress, Format, DownloadOptions, BinOptions};
 use probe_rs::MemoryInterface;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::{Emitter, State, Window};
+
+/// 擦除模式
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum EraseMode {
+    #[default]
+    ChipErase,    // 整片擦除
+    SectorErase,  // 扇区擦除
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlashOptions {
@@ -12,6 +20,8 @@ pub struct FlashOptions {
     pub verify: bool,
     pub skip_erase: bool,
     pub reset_after: bool,
+    #[serde(default)]
+    pub erase_mode: EraseMode,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -112,8 +122,25 @@ pub async fn flash_firmware(
         _ => Format::Elf, // 默认尝试ELF格式
     };
 
+    // 根据擦除模式配置下载选项
+    let mut download_options = DownloadOptions::default();
+    if options.skip_erase {
+        download_options.skip_erase = true;
+    } else {
+        match options.erase_mode {
+            EraseMode::ChipErase => {
+                download_options.do_chip_erase = true;
+            }
+            EraseMode::SectorErase => {
+                download_options.do_chip_erase = false;
+                // probe-rs 默认使用扇区擦除
+            }
+        }
+    }
+    download_options.verify = options.verify;
+
     // 执行下载
-    download_file(session, path, format)
+    download_file_with_options(session, path, format, download_options)
         .map_err(|e| AppError::FlashError(e.to_string()))?;
 
     // 重置芯片
@@ -134,33 +161,96 @@ pub async fn flash_firmware(
     Ok(())
 }
 
+#[derive(Debug, Deserialize)]
+pub struct EraseChipOptions {
+    #[serde(default)]
+    pub erase_mode: EraseMode,
+}
+
 #[tauri::command]
-pub async fn erase_chip(state: State<'_, AppState>, window: Window) -> AppResult<()> {
+pub async fn erase_chip(
+    options: Option<EraseChipOptions>,
+    state: State<'_, AppState>,
+    window: Window,
+) -> AppResult<()> {
     let mut session_guard = state.session.lock();
     let session = session_guard
         .as_mut()
         .ok_or(AppError::NotConnected)?;
 
-    let _ = window.emit(
-        "flash-progress",
-        FlashProgressEvent {
-            phase: "erase".to_string(),
-            progress: 0.0,
-            message: "开始全片擦除".to_string(),
-        },
-    );
+    let erase_mode = options.map(|o| o.erase_mode).unwrap_or(EraseMode::ChipErase);
 
-    let progress = FlashProgress::new(|_| {});
-    erase_all(session, progress).map_err(|e| AppError::FlashError(e.to_string()))?;
+    match erase_mode {
+        EraseMode::ChipErase => {
+            let _ = window.emit(
+                "flash-progress",
+                FlashProgressEvent {
+                    phase: "erase".to_string(),
+                    progress: 0.0,
+                    message: "开始全片擦除".to_string(),
+                },
+            );
 
-    let _ = window.emit(
-        "flash-progress",
-        FlashProgressEvent {
-            phase: "complete".to_string(),
-            progress: 1.0,
-            message: "全片擦除完成".to_string(),
-        },
-    );
+            let progress = FlashProgress::new(|_| {});
+            erase_all(session, progress).map_err(|e| AppError::FlashError(e.to_string()))?;
+
+            let _ = window.emit(
+                "flash-progress",
+                FlashProgressEvent {
+                    phase: "complete".to_string(),
+                    progress: 1.0,
+                    message: "全片擦除完成".to_string(),
+                },
+            );
+        }
+        EraseMode::SectorErase => {
+            let _ = window.emit(
+                "flash-progress",
+                FlashProgressEvent {
+                    phase: "erase".to_string(),
+                    progress: 0.0,
+                    message: "开始扇区擦除".to_string(),
+                },
+            );
+
+            // 获取所有 Flash 区域并逐个扇区擦除
+            let flash_regions: Vec<_> = session.target().memory_map.iter()
+                .filter_map(|region| {
+                    if let probe_rs::config::MemoryRegion::Nvm(r) = region {
+                        Some((r.range.start, r.range.end - r.range.start))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            for (address, size) in flash_regions {
+                // 使用 FlashLoader 进行扇区擦除
+                let mut loader = session.target().flash_loader();
+
+                // 添加 0xFF 数据来触发扇区擦除
+                let erase_data = vec![0xFFu8; size as usize];
+                loader.add_data(address, &erase_data)
+                    .map_err(|e| AppError::FlashError(e.to_string()))?;
+
+                let mut download_options = DownloadOptions::default();
+                download_options.do_chip_erase = false; // 使用扇区擦除
+                download_options.skip_erase = false;
+
+                loader.commit(session, download_options)
+                    .map_err(|e| AppError::FlashError(e.to_string()))?;
+            }
+
+            let _ = window.emit(
+                "flash-progress",
+                FlashProgressEvent {
+                    phase: "complete".to_string(),
+                    progress: 1.0,
+                    message: "扇区擦除完成".to_string(),
+                },
+            );
+        }
+    }
 
     Ok(())
 }
