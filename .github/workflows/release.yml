@@ -69,10 +69,16 @@ jobs:
         shell: bash
         run: |
           cd src-tauri/icons
-          # 生成不同尺寸的PNG
-          convert icon.png -resize 32x32 32x32.png || magick icon.png -resize 32x32 32x32.png || true
-          convert icon.png -resize 128x128 128x128.png || magick icon.png -resize 128x128 128x128.png || true
-          convert icon.png -resize 256x256 128x128@2x.png || magick icon.png -resize 256x256 128x128@2x.png || true
+          # 生成不同尺寸的PNG (确保RGBA格式)
+          if command -v magick &> /dev/null; then
+            magick icon.png -resize 32x32 -define png:color-type=6 32x32.png
+            magick icon.png -resize 128x128 -define png:color-type=6 128x128.png
+            magick icon.png -resize 256x256 -define png:color-type=6 128x128@2x.png
+          else
+            convert icon.png -resize 32x32 -define png:color-type=6 32x32.png
+            convert icon.png -resize 128x128 -define png:color-type=6 128x128.png
+            convert icon.png -resize 256x256 -define png:color-type=6 128x128@2x.png
+          fi
           # macOS icns
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             mkdir -p icon.iconset
@@ -85,7 +91,7 @@ jobs:
             sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png
             sips -z 512 512 icon.png --out icon.iconset/icon_256x256@2x.png
             sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png
-            sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png || sips -z 512 512 icon.png --out icon.iconset/icon_512x512@2x.png
+            sips -z 512 512 icon.png --out icon.iconset/icon_512x512@2x.png
             iconutil -c icns icon.iconset -o icon.icns
             rm -rf icon.iconset
           fi
