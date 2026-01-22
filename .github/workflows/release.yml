@@ -11,7 +11,6 @@ on:
         required: false
         default: ''
 
-# 添加写入权限
 permissions:
   contents: write
 
@@ -29,12 +28,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             os_name: windows
 
-          # macOS Intel (使用 macos-14 + x86_64 target)
-          - platform: macos-14
-            target: x86_64-apple-darwin
-            os_name: macos-intel
-
-          # macOS Apple Silicon
+          # macOS Apple Silicon (原生)
           - platform: macos-14
             target: aarch64-apple-darwin
             os_name: macos-arm
@@ -61,13 +55,41 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libudev-dev \
-            libusb-1.0-0-dev
+            libusb-1.0-0-dev \
+            imagemagick
 
-      # macOS Intel 需要安装 Rosetta 和 x86_64 工具链
-      - name: Setup macOS Intel build
-        if: matrix.os_name == 'macos-intel'
+      # macOS 依赖
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
         run: |
-          softwareupdate --install-rosetta --agree-to-license || true
+          brew install imagemagick
+
+      # 生成各平台所需的图标格式
+      - name: Generate icons
+        shell: bash
+        run: |
+          cd src-tauri/icons
+          # 生成不同尺寸的PNG
+          convert icon.png -resize 32x32 32x32.png || magick icon.png -resize 32x32 32x32.png || true
+          convert icon.png -resize 128x128 128x128.png || magick icon.png -resize 128x128 128x128.png || true
+          convert icon.png -resize 256x256 128x128@2x.png || magick icon.png -resize 256x256 128x128@2x.png || true
+          # macOS icns
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            mkdir -p icon.iconset
+            sips -z 16 16 icon.png --out icon.iconset/icon_16x16.png
+            sips -z 32 32 icon.png --out icon.iconset/icon_16x16@2x.png
+            sips -z 32 32 icon.png --out icon.iconset/icon_32x32.png
+            sips -z 64 64 icon.png --out icon.iconset/icon_32x32@2x.png
+            sips -z 128 128 icon.png --out icon.iconset/icon_128x128.png
+            sips -z 256 256 icon.png --out icon.iconset/icon_128x128@2x.png
+            sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png
+            sips -z 512 512 icon.png --out icon.iconset/icon_256x256@2x.png
+            sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png
+            sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png || sips -z 512 512 icon.png --out icon.iconset/icon_512x512@2x.png
+            iconutil -c icns icon.iconset -o icon.icns
+            rm -rf icon.iconset
+          fi
+          ls -la
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -122,14 +144,13 @@ jobs:
             |------|------|------|
             | **Windows** | `*_x64-setup.exe` | NSIS安装程序 (推荐) |
             | **Windows** | `*_x64_en-US.msi` | MSI安装包 |
-            | **macOS (Intel)** | `*_x64.dmg` | Intel芯片Mac |
             | **macOS (Apple Silicon)** | `*_aarch64.dmg` | M1/M2/M3芯片Mac |
             | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
             | **Linux** | `*_amd64.AppImage` | 通用Linux |
 
             ### 系统要求
             - **Windows**: Windows 10/11 64位，需要WebView2运行时
-            - **macOS**: macOS 10.15+ (Catalina或更高)
+            - **macOS**: macOS 11.0+ (Big Sur或更高), Apple Silicon
             - **Linux**: 需要WebKitGTK和libusb
 
             ### 更新日志
