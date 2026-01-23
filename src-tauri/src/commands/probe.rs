@@ -262,3 +262,155 @@ pub async fn get_connection_status(state: State<'_, AppState>) -> AppResult<Conn
         info: conn_info.clone(),
     })
 }
+
+// ==================== RTT 独立连接命令 ====================
+
+#[tauri::command]
+pub async fn connect_rtt(
+    options: ConnectOptions,
+    state: State<'_, AppState>,
+) -> AppResult<TargetInfo> {
+    // 关闭现有 RTT 连接
+    {
+        let mut rtt_session_guard = state.rtt_session.lock();
+        *rtt_session_guard = None;
+    }
+
+    let lister = Lister::new();
+    let probes = lister.list_all();
+
+    let probe_info = probes
+        .iter()
+        .find(|p| p.identifier == options.probe_identifier)
+        .ok_or_else(|| AppError::ProbeError("未找到指定的探针".to_string()))?;
+
+    let mut probe = probe_info
+        .open()
+        .map_err(|e| AppError::ProbeError(e.to_string()))?;
+
+    // 设置协议
+    let protocol = match options.interface_type {
+        InterfaceType::Swd => WireProtocol::Swd,
+        InterfaceType::Jtag => WireProtocol::Jtag,
+    };
+    probe
+        .select_protocol(protocol)
+        .map_err(|e| AppError::ProbeError(e.to_string()))?;
+
+    // 设置时钟速度（前端传递的是Hz，probe-rs需要kHz）
+    if let Some(speed_hz) = options.clock_speed {
+        let speed_khz = speed_hz / 1000;
+        probe
+            .set_speed(speed_khz)
+            .map_err(|e| AppError::ProbeError(format!("设置时钟速度失败 ({} kHz): {}", speed_khz, e)))?;
+    }
+
+    let target_idcode: Option<u32> = None;
+
+    // 连接目标
+    let mut session = if options.connect_mode == ConnectMode::UnderReset {
+        probe
+            .attach_under_reset(&options.target, Permissions::default())
+            .map_err(|e| AppError::ProbeError(e.to_string()))?
+    } else {
+        probe
+            .attach(&options.target, Permissions::default())
+            .map_err(|e| AppError::ProbeError(e.to_string()))?
+    };
+
+    // 读取芯片ID
+    let chip_id = read_chip_id(&mut session);
+
+    // 获取目标信息
+    let target = session.target();
+    let target_info = TargetInfo {
+        name: target.name.clone(),
+        core_type: format!("{:?}", target.cores.first().map(|c| c.core_type)),
+        memory_regions: target
+            .memory_map
+            .iter()
+            .map(|region| {
+                let (name, kind, address, size) = match region {
+                    probe_rs::config::MemoryRegion::Ram(r) => {
+                        (r.name.clone().unwrap_or_default(), "RAM", r.range.start, r.range.end - r.range.start)
+                    }
+                    probe_rs::config::MemoryRegion::Nvm(r) => {
+                        (r.name.clone().unwrap_or_default(), "Flash", r.range.start, r.range.end - r.range.start)
+                    }
+                    probe_rs::config::MemoryRegion::Generic(r) => {
+                        (r.name.clone().unwrap_or_default(), "Generic", r.range.start, r.range.end - r.range.start)
+                    }
+                };
+                MemoryRegion {
+                    name,
+                    kind: kind.to_string(),
+                    address,
+                    size,
+                }
+            })
+            .collect(),
+        flash_algorithms: target
+            .flash_algorithms
+            .iter()
+            .map(|a| a.name.clone())
+            .collect(),
+        chip_id,
+    };
+
+    // 存储 RTT 连接信息
+    {
+        let mut rtt_conn_info = state.rtt_connection_info.lock();
+        *rtt_conn_info = Some(ConnectionInfo {
+            probe_name: options.probe_identifier.clone(),
+            probe_serial: probe_info.serial_number.clone(),
+            target_name: options.target.clone(),
+            core_type: target_info.core_type.clone(),
+            chip_id,
+            target_idcode,
+        });
+    }
+
+    // 存储 RTT session
+    {
+        let mut rtt_session_guard = state.rtt_session.lock();
+        *rtt_session_guard = Some(session);
+    }
+
+    Ok(target_info)
+}
+
+#[tauri::command]
+pub async fn disconnect_rtt(state: State<'_, AppState>) -> AppResult<()> {
+    // 停止 RTT
+    state.rtt_state.set_running(false);
+
+    // 释放 RTT session
+    {
+        let mut rtt_session_guard = state.rtt_session.lock();
+        if let Some(session) = rtt_session_guard.as_mut() {
+            if let Ok(mut core) = session.core(0) {
+                let _ = core.run();
+            }
+        }
+        *rtt_session_guard = None;
+    }
+
+    // 清除 RTT 连接信息
+    let mut rtt_conn_info = state.rtt_connection_info.lock();
+    *rtt_conn_info = None;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_rtt_connection_status(state: State<'_, AppState>) -> AppResult<ConnectionStatus> {
+    let rtt_session_guard = state.rtt_session.lock();
+    let connected = rtt_session_guard.is_some();
+
+    let rtt_conn_info = state.rtt_connection_info.lock();
+
+    Ok(ConnectionStatus {
+        connected,
+        info: rtt_conn_info.clone(),
+    })
+}

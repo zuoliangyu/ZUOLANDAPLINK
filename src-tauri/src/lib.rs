@@ -25,6 +25,10 @@ pub fn run() {
             probe::connect_target,
             probe::disconnect,
             probe::get_connection_status,
+            // RTT 独立连接命令
+            probe::connect_rtt,
+            probe::disconnect_rtt,
+            probe::get_rtt_connection_status,
             // Flash命令
             flash::flash_firmware,
             flash::erase_chip,

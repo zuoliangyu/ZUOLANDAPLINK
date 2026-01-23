@@ -5,6 +5,7 @@ interface ProbeState {
   // 状态
   probes: ProbeInfo[];
   selectedProbe: ProbeInfo | null;
+  selectedChipName: string; // 新增：用户输入的芯片名称
   connected: boolean;
   connectionInfo: ConnectionInfo | null;
   targetInfo: TargetInfo | null;
@@ -19,6 +20,7 @@ interface ProbeState {
   // 操作
   setProbes: (probes: ProbeInfo[]) => void;
   selectProbe: (probe: ProbeInfo | null) => void;
+  setSelectedChipName: (chipName: string) => void; // 新增
   setConnected: (connected: boolean, info?: ConnectionInfo | null, target?: TargetInfo | null) => void;
   setSettings: (settings: Partial<DeviceSettings>) => void;
   setLoading: (loading: boolean) => void;
@@ -39,6 +41,7 @@ const defaultSettings: DeviceSettings = {
 export const useProbeStore = create<ProbeState>((set) => ({
   probes: [],
   selectedProbe: null,
+  selectedChipName: "", // 新增：初始为空
   connected: false,
   connectionInfo: null,
   targetInfo: null,
@@ -51,6 +54,8 @@ export const useProbeStore = create<ProbeState>((set) => ({
   setProbes: (probes) => set({ probes }),
 
   selectProbe: (probe) => set({ selectedProbe: probe }),
+
+  setSelectedChipName: (selectedChipName) => set({ selectedChipName }), // 新增
 
   setConnected: (connected, info = null, target = null) =>
     set({ connected, connectionInfo: info, targetInfo: target }),

@@ -28,6 +28,7 @@ export function Sidebar() {
     autoDisconnectTimeout,
     setProbes,
     selectProbe,
+    setSelectedChipName, // 新增
     setConnected,
     setSettings,
     setLoading,
@@ -54,14 +55,21 @@ export function Sidebar() {
       setLoading(true);
       const probeList = await listProbes();
       setProbes(probeList);
-      addLog("info", `检测到 ${probeList.length} 个探针`);
+
+      // 自动选择第一个探针（如果有且当前没有选择）
+      if (probeList.length > 0 && !selectedProbe) {
+        selectProbe(probeList[0]);
+        addLog("info", `检测到 ${probeList.length} 个探针，已自动选择第一个`);
+      } else {
+        addLog("info", `检测到 ${probeList.length} 个探针`);
+      }
     } catch (error) {
       setError(String(error));
       addLog("error", `探针检测失败: ${error}`);
     } finally {
       setLoading(false);
     }
-  }, [setLoading, setProbes, setError, addLog]);
+  }, [setLoading, setProbes, selectProbe, selectedProbe, setError, addLog]);
 
   useEffect(() => {
     refreshProbes();
@@ -138,6 +146,7 @@ export function Sidebar() {
     selectChip(chipName);
     setSearchQuery(chipName);
     setSearchResults([]);
+    setSelectedChipName(chipName); // 同步到 probeStore
 
     try {
       const info = await getChipInfo(chipName);

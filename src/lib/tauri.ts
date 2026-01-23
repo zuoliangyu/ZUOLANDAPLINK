@@ -33,6 +33,19 @@ export async function getConnectionStatus(): Promise<ConnectionStatus> {
   return await invoke<ConnectionStatus>("get_connection_status");
 }
 
+// RTT 独立连接命令
+export async function connectRtt(options: ConnectOptions): Promise<TargetInfo> {
+  return await invoke<TargetInfo>("connect_rtt", { options });
+}
+
+export async function disconnectRtt(): Promise<void> {
+  return await invoke("disconnect_rtt");
+}
+
+export async function getRttConnectionStatus(): Promise<ConnectionStatus> {
+  return await invoke<ConnectionStatus>("get_rtt_connection_status");
+}
+
 // Flash命令
 export async function flashFirmware(options: FlashOptions): Promise<void> {
   return await invoke("flash_firmware", { options });

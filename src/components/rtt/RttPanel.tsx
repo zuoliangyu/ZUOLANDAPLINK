@@ -3,25 +3,14 @@ import { useRttEvents } from "@/hooks/useRttEvents";
 import { RttToolbar } from "./RttToolbar";
 import { RttViewer } from "./RttViewer";
 import { RttStatusBar } from "./RttStatusBar";
-import { useProbeStore } from "@/stores/probeStore";
-import { Terminal } from "lucide-react";
 
 export function RttPanel() {
-  const { connected } = useProbeStore();
   const { error } = useRttStore();
 
   // 监听 RTT 事件
   useRttEvents();
 
-  if (!connected) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center text-muted-foreground">
-        <Terminal className="h-12 w-12 mb-4 opacity-50" />
-        <p className="text-sm">请先连接目标设备</p>
-      </div>
-    );
-  }
-
+  // 移除主连接检查，RTT 现在是独立的
   return (
     <div className="flex flex-col h-full">
       {/* 工具栏 */}

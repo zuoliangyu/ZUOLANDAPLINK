@@ -5,6 +5,51 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.3] - 2026-01-23
+
+### 重大改进
+- 🚀 **RTT 独立连接架构重构** - RTT 调试功能现在完全独立于烧录连接，可单独使用
+- ✨ **共用配置，独立连接** - 烧录和 RTT 共用左侧边栏的探针、芯片、接口配置，但连接生命周期完全独立
+
+### 新增
+- ✨ **RTT 独立连接命令** - 新增 `connect_rtt()`, `disconnect_rtt()`, `get_rtt_connection_status()` 后端命令
+- ✨ **RTT 连接状态管理** - 新增 `rttConnected`, `rttConnecting` 状态管理
+- ✨ **RTT 工具栏连接控制** - 添加独立的"连接 RTT"/"断开 RTT"按钮
+- ✨ **自动选择探针** - 应用启动时自动检测并选择第一个可用探针
+- ✨ **智能芯片名称获取** - 支持直接使用输入框的芯片名称，无需从搜索结果中点击选择
+
+### 改进
+- 🎨 **移除 RTT 主连接依赖** - RTT 界面不再要求先连接主设备（烧录连接）
+- 🎨 **优化用户体验** - 用户可以直接在 RTT 标签页中连接和使用 RTT，无需额外配置
+- 🎨 **独立会话管理** - 后端使用独立的 `rtt_session` 管理 RTT 连接，与 `session`（烧录连接）分离
+- 🎨 **全局配置共享** - 探针、芯片、接口设置在 `probeStore` 中统一管理，烧录和 RTT 共用
+
+### 修复
+- 🐛 **修复 RTT 界面访问限制** - 移除 `RttPanel` 中对主连接状态的检查
+- 🐛 **修复探针选择问题** - 自动选择第一个探针，避免用户手动选择的困扰
+- 🐛 **修复芯片名称获取逻辑** - 优先使用选中的芯片，如果为空则使用输入框的值
+
+### 技术细节
+- 后端新增 `rtt_session: Arc<Mutex<Option<Session>>>` 独立会话
+- 后端新增 `rtt_connection_info` 存储 RTT 连接信息
+- 前端新增 `selectedChipName` 状态同步芯片选择
+- 修改 `RttPanel.tsx` 移除主连接检查逻辑
+- 修改 `Sidebar.tsx` 实现探针自动选择和芯片名称同步
+- 修改 `RttToolbar.tsx` 实现独立的 RTT 连接逻辑
+
+### 架构说明
+```
+左侧边栏（全局配置）
+├── 探针选择
+├── 芯片搜索
+└── 接口设置
+    ├── Header 连接按钮 → 烧录连接（session）
+    └── RTT 连接按钮 → RTT 连接（rtt_session）
+```
+
+### 已知问题
+- ⚠️ v0.3.2 版本发布失败（GitHub Actions 权限问题：Resource not accessible by integration）
+
 ## [0.3.2] - 2026-01-23
 
 ### 改进

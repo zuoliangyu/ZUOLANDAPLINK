@@ -4,7 +4,11 @@ import type { ColorParserConfig } from "@/lib/rttColorParser";
 import { loadColorParserConfig, saveColorParserConfig } from "@/lib/rttColorParser";
 
 interface RttState {
-  // 连接状态
+  // RTT 连接状态
+  rttConnected: boolean;
+  rttConnecting: boolean;
+
+  // 运行状态
   isRunning: boolean;
   isPaused: boolean;
   error: string | null;
@@ -35,6 +39,8 @@ interface RttState {
   lineIdCounter: number;
 
   // 操作
+  setRttConnected: (connected: boolean) => void;
+  setRttConnecting: (connecting: boolean) => void;
   setRunning: (running: boolean) => void;
   setPaused: (paused: boolean) => void;
   setError: (error: string | null) => void;
@@ -72,6 +78,8 @@ function parseLogLevel(text: string): RttLine["level"] {
 
 export const useRttStore = create<RttState>((set) => ({
   // 初始状态
+  rttConnected: false,
+  rttConnecting: false,
   isRunning: false,
   isPaused: false,
   error: null,
@@ -90,6 +98,10 @@ export const useRttStore = create<RttState>((set) => ({
   pollInterval: 10, // 默认 10ms，更快的轮询
   totalBytes: 0,
   lineIdCounter: 0,
+
+  setRttConnected: (rttConnected) => set({ rttConnected }),
+
+  setRttConnecting: (rttConnecting) => set({ rttConnecting }),
 
   setRunning: (isRunning) => set({ isRunning, error: null }),
 
@@ -146,6 +158,8 @@ export const useRttStore = create<RttState>((set) => ({
 
   reset: () =>
     set({
+      rttConnected: false,
+      rttConnecting: false,
       isRunning: false,
       isPaused: false,
       error: null,

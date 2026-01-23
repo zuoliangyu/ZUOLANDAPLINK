@@ -87,10 +87,10 @@ pub async fn start_rtt(
 
     // 获取通道信息并找到控制块地址
     let (up_channels, down_channels, found_address) = {
-        let mut session_guard = state.session.lock();
-        let session = session_guard
+        let mut rtt_session_guard = state.rtt_session.lock();
+        let session = rtt_session_guard
             .as_mut()
-            .ok_or(AppError::NotConnected)?;
+            .ok_or(AppError::RttError("RTT 未连接，请先连接 RTT".to_string()))?;
 
         let mut core = session.core(0).map_err(|e| AppError::RttError(e.to_string()))?;
 
@@ -149,7 +149,7 @@ pub async fn start_rtt(
 
     // 启动后台轮询任务
     let rtt_state = Arc::clone(&state.rtt_state);
-    let session_arc = Arc::clone(&state.session);
+    let session_arc = Arc::clone(&state.rtt_session);
 
     tokio::spawn(async move {
         rtt_polling_task(rtt_state, session_arc, app_handle, poll_interval, halt_on_read).await;
@@ -450,7 +450,7 @@ pub async fn write_rtt(
         return Err(AppError::RttError("RTT 未运行".to_string()));
     }
 
-    let mut session_guard = state.session.lock();
+    let mut session_guard = state.rtt_session.lock();
     let session = session_guard
         .as_mut()
         .ok_or(AppError::NotConnected)?;
