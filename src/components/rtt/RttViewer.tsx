@@ -186,15 +186,35 @@ function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
       .join(" ");
   };
 
-  // 优先使用自定义颜色标记解析，如果禁用则使用 ANSI 解析
+  // 同时支持 ANSI 和自定义颜色标记
   const textSegments = useMemo(() => {
+    // 先解析 ANSI 转义序列
+    const ansiSegments = parseAnsiText(line.text);
+
+    // 如果启用了自定义标记，在每个 ANSI 片段中再解析自定义标记
     if (colorParserConfig.enabled) {
-      return parseColoredText(line.text, colorParserConfig);
+      const result: Array<{ text: string; className?: string; styles?: React.CSSProperties }> = [];
+
+      for (const ansiSeg of ansiSegments) {
+        const customSegments = parseColoredText(ansiSeg.text, colorParserConfig);
+
+        // 合并 ANSI 的 className 和自定义标记的 styles
+        for (const customSeg of customSegments) {
+          result.push({
+            text: customSeg.text,
+            className: ansiSeg.className,
+            styles: customSeg.styles,
+          });
+        }
+      }
+
+      return result;
     } else {
-      // 使用原有的 ANSI 解析
-      return parseAnsiText(line.text).map(seg => ({
+      // 只使用 ANSI 解析
+      return ansiSegments.map(seg => ({
         text: seg.text,
-        styles: seg.className ? {} : {}, // 保持原有逻辑
+        className: seg.className,
+        styles: {},
       }));
     }
   }, [line.text, colorParserConfig]);
@@ -211,18 +231,10 @@ function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
         <span className="whitespace-pre-wrap break-all font-mono">
           {formatHex(line.rawData || [])}
         </span>
-      ) : colorParserConfig.enabled ? (
-        <span className="whitespace-pre-wrap break-all">
-          {textSegments.map((segment, index) => (
-            <span key={index} style={segment.styles}>
-              {segment.text}
-            </span>
-          ))}
-        </span>
       ) : (
         <span className="whitespace-pre-wrap break-all">
-          {parseAnsiText(line.text).map((segment, index) => (
-            <span key={index} className={segment.className}>
+          {textSegments.map((segment, index) => (
+            <span key={index} className={segment.className} style={segment.styles}>
               {segment.text}
             </span>
           ))}
