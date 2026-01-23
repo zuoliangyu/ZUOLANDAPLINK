@@ -134,6 +134,27 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      # 提取 CHANGELOG 中当前版本的更新内容
+      - name: Extract changelog
+        id: changelog
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"  # 移除 v 前缀
+
+          # 从 CHANGELOG.md 提取当前版本的内容
+          CHANGELOG=$(awk "/## \[${VERSION_NUM}\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
+
+          # 如果提取失败，使用默认内容
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="查看完整更新日志: [CHANGELOG.md](https://github.com/zuoliangyu/ZUOLANDAPLINK/blob/main/CHANGELOG.md)"
+          fi
+
+          # 输出到 GitHub Actions 环境变量（处理多行）
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -144,7 +165,7 @@ jobs:
           releaseBody: |
             ## ZUOLAN DAPLINK RTTVIEW
 
-            ### 下载说明
+            ### 📦 下载说明
 
             | 平台 | 文件 | 说明 |
             |------|------|------|
@@ -154,13 +175,20 @@ jobs:
             | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
             | **Linux** | `*_amd64.AppImage` | 通用Linux |
 
-            ### 系统要求
+            ### 💻 系统要求
             - **Windows**: Windows 10/11 64位，需要WebView2运行时
             - **macOS**: macOS 11.0+ (Big Sur或更高), Apple Silicon
             - **Linux**: 需要WebKitGTK和libusb
 
-            ### 更新日志
-            请查看 [CHANGELOG](https://github.com/zuoliangyu/ZUOLANDAPLINK/commits/main)
+            ---
+
+            ## 📝 更新日志
+
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ---
+
+            完整更新历史: [CHANGELOG.md](https://github.com/zuoliangyu/ZUOLANDAPLINK/blob/main/CHANGELOG.md)
           releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
