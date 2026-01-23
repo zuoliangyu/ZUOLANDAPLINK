@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { useProbeStore } from "@/stores/probeStore";
 import { useChipStore } from "@/stores/chipStore";
 import { useLogStore } from "@/stores/logStore";
-import { listProbes, connectTarget, disconnect, searchChips, getChipInfo } from "@/lib/tauri";
+import { listProbes, connectTarget, disconnect, searchChips, getChipInfo, getConnectionStatus } from "@/lib/tauri";
 import { PackManager } from "@/components/config/PackManager";
 
 export function Sidebar() {
@@ -94,7 +94,6 @@ export function Sidebar() {
       });
 
       // 从后端获取完整的连接信息
-      const { getConnectionStatus } = await import("@/lib/tauri");
       const status = await getConnectionStatus();
 
       setConnected(true, status.info, targetInfo);
