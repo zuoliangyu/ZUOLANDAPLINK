@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo } from "react";
 import { useRttStore } from "@/stores/rttStore";
 import { cn } from "@/lib/utils";
 import type { RttLine } from "@/lib/types";
+import { parseColoredText } from "@/lib/rttColorParser";
 
 // ANSI 颜色映射
 const ANSI_COLORS: Record<string, string> = {
@@ -154,6 +155,8 @@ interface RttLineItemProps {
 }
 
 function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
+  const colorParserConfig = useRttStore((state) => state.colorParserConfig);
+
   const levelColors: Record<RttLine["level"], string> = {
     error: "text-red-500",
     warn: "text-yellow-500",
@@ -183,8 +186,18 @@ function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
       .join(" ");
   };
 
-  // 解析 ANSI 颜色
-  const segments = parseAnsiText(line.text);
+  // 优先使用自定义颜色标记解析，如果禁用则使用 ANSI 解析
+  const textSegments = useMemo(() => {
+    if (colorParserConfig.enabled) {
+      return parseColoredText(line.text, colorParserConfig);
+    } else {
+      // 使用原有的 ANSI 解析
+      return parseAnsiText(line.text).map(seg => ({
+        text: seg.text,
+        styles: seg.className ? {} : {}, // 保持原有逻辑
+      }));
+    }
+  }, [line.text, colorParserConfig]);
 
   return (
     <div className={cn("flex gap-2 py-0.5 hover:bg-muted/50", levelColors[line.level])}>
@@ -198,9 +211,17 @@ function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
         <span className="whitespace-pre-wrap break-all font-mono">
           {formatHex(line.rawData || [])}
         </span>
+      ) : colorParserConfig.enabled ? (
+        <span className="whitespace-pre-wrap break-all">
+          {textSegments.map((segment, index) => (
+            <span key={index} style={segment.styles}>
+              {segment.text}
+            </span>
+          ))}
+        </span>
       ) : (
         <span className="whitespace-pre-wrap break-all">
-          {segments.map((segment, index) => (
+          {parseAnsiText(line.text).map((segment, index) => (
             <span key={index} className={segment.className}>
               {segment.text}
             </span>

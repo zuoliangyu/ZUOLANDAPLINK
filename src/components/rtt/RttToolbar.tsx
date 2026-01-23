@@ -15,6 +15,7 @@ import {
   FileText,
   Binary,
 } from "lucide-react";
+import { ColorSettingsDialog } from "./ColorSettingsDialog";
 
 export function RttToolbar() {
   const {
@@ -214,6 +215,9 @@ export function RttToolbar() {
         <Download className="h-3.5 w-3.5" />
         导出
       </Button>
+
+      {/* 颜色设置 */}
+      <ColorSettingsDialog />
     </div>
   );
 }

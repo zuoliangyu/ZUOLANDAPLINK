@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { RttChannel, RttLine, RttScanMode } from "@/lib/types";
+import type { ColorParserConfig } from "@/lib/rttColorParser";
+import { loadColorParserConfig, saveColorParserConfig } from "@/lib/rttColorParser";
 
 interface RttState {
   // 连接状态
@@ -21,6 +23,7 @@ interface RttState {
   showTimestamp: boolean;
   searchQuery: string;
   displayMode: "text" | "hex"; // 新增：显示模式
+  colorParserConfig: ColorParserConfig; // 新增：颜色解析配置
 
   // 配置
   scanMode: RttScanMode;
@@ -44,6 +47,7 @@ interface RttState {
   setShowTimestamp: (show: boolean) => void;
   setSearchQuery: (query: string) => void;
   setDisplayMode: (mode: "text" | "hex") => void; // 新增
+  setColorParserConfig: (config: ColorParserConfig) => void; // 新增
   setScanMode: (mode: RttScanMode) => void;
   setScanAddress: (address: number) => void;
   setPollInterval: (interval: number) => void;
@@ -80,6 +84,7 @@ export const useRttStore = create<RttState>((set) => ({
   showTimestamp: true,
   searchQuery: "",
   displayMode: "text", // 新增：默认文本模式
+  colorParserConfig: loadColorParserConfig(), // 新增：从 localStorage 加载配置
   scanMode: "auto",
   scanAddress: 0x20000000,
   pollInterval: 10, // 默认 10ms，更快的轮询
@@ -124,6 +129,11 @@ export const useRttStore = create<RttState>((set) => ({
   setSearchQuery: (searchQuery) => set({ searchQuery }),
 
   setDisplayMode: (displayMode) => set({ displayMode }), // 新增
+
+  setColorParserConfig: (colorParserConfig) => {
+    saveColorParserConfig(colorParserConfig); // 保存到 localStorage
+    set({ colorParserConfig });
+  },
 
   setScanMode: (scanMode) => set({ scanMode }),
 
