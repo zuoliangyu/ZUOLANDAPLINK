@@ -136,11 +136,12 @@ pub async fn connect_target(
         .select_protocol(protocol)
         .map_err(|e| AppError::ProbeError(e.to_string()))?;
 
-    // 设置时钟速度
-    if let Some(speed) = options.clock_speed {
+    // 设置时钟速度（前端传递的是Hz，probe-rs需要kHz）
+    if let Some(speed_hz) = options.clock_speed {
+        let speed_khz = speed_hz / 1000;
         probe
-            .set_speed(speed)
-            .map_err(|e| AppError::ProbeError(e.to_string()))?;
+            .set_speed(speed_khz)
+            .map_err(|e| AppError::ProbeError(format!("设置时钟速度失败 ({} kHz): {}", speed_khz, e)))?;
     }
 
     // 尝试在连接前读取目标IDCODE
