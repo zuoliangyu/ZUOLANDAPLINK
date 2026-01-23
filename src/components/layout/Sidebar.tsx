@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Plug, Unplug } from "lucide-react";
+import { RefreshCw, Plug, Unplug, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -49,6 +54,10 @@ export function Sidebar() {
 
   const addLog = useLogStore((state) => state.addLog);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  // 折叠状态
+  const [interfaceSettingsOpen, setInterfaceSettingsOpen] = useState(false);
+  const [autoDisconnectOpen, setAutoDisconnectOpen] = useState(false);
 
   const refreshProbes = useCallback(async () => {
     try {
@@ -238,11 +247,22 @@ export function Sidebar() {
       <PackManager />
 
       {/* 接口设置 */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">接口设置</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Collapsible open={interfaceSettingsOpen} onOpenChange={setInterfaceSettingsOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="py-3 cursor-pointer hover:bg-accent/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">接口设置</CardTitle>
+                {interfaceSettingsOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-3">
           <div>
             <label className="text-xs text-muted-foreground">接口类型</label>
             <Select
@@ -323,14 +343,27 @@ export function Sidebar() {
             </Select>
           </div>
         </CardContent>
-      </Card>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* 自动断开设置 */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">自动断开</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Collapsible open={autoDisconnectOpen} onOpenChange={setAutoDisconnectOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="py-3 cursor-pointer hover:bg-accent/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">自动断开</CardTitle>
+                {autoDisconnectOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs text-muted-foreground">启用自动断开</label>
             <Button
@@ -370,7 +403,9 @@ export function Sidebar() {
             </div>
           )}
         </CardContent>
-      </Card>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* 连接按钮 */}
       <Button

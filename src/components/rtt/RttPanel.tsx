@@ -3,9 +3,11 @@ import { useRttEvents } from "@/hooks/useRttEvents";
 import { RttToolbar } from "./RttToolbar";
 import { RttViewer } from "./RttViewer";
 import { RttStatusBar } from "./RttStatusBar";
+import { RttChartViewer } from "./RttChartViewer";
+import { Panel, Group, Separator } from "react-resizable-panels";
 
 export function RttPanel() {
-  const { error } = useRttStore();
+  const { error, viewMode, splitRatio, setSplitRatio } = useRttStore();
 
   // 监听 RTT 事件
   useRttEvents();
@@ -25,7 +27,26 @@ export function RttPanel() {
 
       {/* 数据显示区 */}
       <div className="flex-1 overflow-hidden">
-        <RttViewer />
+        {viewMode === "text" ? (
+          <RttViewer />
+        ) : viewMode === "chart" ? (
+          <RttChartViewer />
+        ) : (
+          // 分屏模式
+          <Group orientation="vertical">
+            <Panel
+              defaultSize={splitRatio * 100}
+              minSize={20}
+              onResize={(panelSize) => setSplitRatio(panelSize.asPercentage / 100)}
+            >
+              <RttViewer />
+            </Panel>
+            <Separator className="h-1 bg-border hover:bg-primary/50 transition-colors" />
+            <Panel defaultSize={(1 - splitRatio) * 100} minSize={20}>
+              <RttChartViewer />
+            </Panel>
+          </Group>
+        )}
       </div>
 
       {/* 状态栏 */}

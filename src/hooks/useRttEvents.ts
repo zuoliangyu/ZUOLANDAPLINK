@@ -2,13 +2,23 @@ import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useRttStore, parseRttData } from "@/stores/rttStore";
 import type { RttDataEvent, RttStatusEvent } from "@/lib/types";
+import { parseChartData } from "@/lib/parseChartData";
 
 /**
  * 监听 RTT 事件的 Hook
  * 在组件挂载时自动订阅 RTT 数据和状态事件
  */
 export function useRttEvents() {
-  const { addLines, addBytes, setRunning, setError } = useRttStore();
+  const {
+    addLines,
+    addBytes,
+    setRunning,
+    setError,
+    addChartData,
+    chartConfig,
+    incrementParseSuccess,
+    incrementParseFail,
+  } = useRttStore();
   const pendingBufferRef = useRef<Map<number, { text: string; rawData: number[] }>>(new Map());
 
   useEffect(() => {
@@ -29,6 +39,19 @@ export function useRttEvents() {
 
       if (lines.length > 0) {
         addLines(lines);
+
+        // 如果图表功能启用，尝试解析图表数据
+        if (chartConfig.enabled) {
+          for (const line of lines) {
+            const result = parseChartData(line.text, chartConfig);
+            if (result.success && result.dataPoint) {
+              addChartData(result.dataPoint);
+              incrementParseSuccess();
+            } else {
+              incrementParseFail();
+            }
+          }
+        }
       }
     });
 
@@ -46,7 +69,16 @@ export function useRttEvents() {
       unlistenData.then((fn) => fn());
       unlistenStatus.then((fn) => fn());
     };
-  }, [addLines, addBytes, setRunning, setError]);
+  }, [
+    addLines,
+    addBytes,
+    setRunning,
+    setError,
+    addChartData,
+    chartConfig,
+    incrementParseSuccess,
+    incrementParseFail,
+  ]);
 }
 
 /**

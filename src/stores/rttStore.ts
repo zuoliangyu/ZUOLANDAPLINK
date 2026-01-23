@@ -2,6 +2,76 @@ import { create } from "zustand";
 import type { RttChannel, RttLine, RttScanMode } from "@/lib/types";
 import type { ColorParserConfig } from "@/lib/rttColorParser";
 import { loadColorParserConfig, saveColorParserConfig } from "@/lib/rttColorParser";
+import type { ChartConfig, ChartDataPoint, ChartSeries, ViewMode } from "@/lib/chartTypes";
+import { DEFAULT_CHART_CONFIG } from "@/lib/chartTypes";
+
+// 图表配置持久化
+const CHART_CONFIG_KEY = "rtt_chart_config";
+const VIEW_MODE_KEY = "rtt_view_mode";
+const SPLIT_RATIO_KEY = "rtt_split_ratio";
+
+function loadChartConfig(): ChartConfig {
+  try {
+    const saved = localStorage.getItem(CHART_CONFIG_KEY);
+    if (saved) {
+      return { ...DEFAULT_CHART_CONFIG, ...JSON.parse(saved) };
+    }
+  } catch (error) {
+    console.error("加载图表配置失败:", error);
+  }
+  return DEFAULT_CHART_CONFIG;
+}
+
+function saveChartConfig(config: ChartConfig) {
+  try {
+    localStorage.setItem(CHART_CONFIG_KEY, JSON.stringify(config));
+  } catch (error) {
+    console.error("保存图表配置失败:", error);
+  }
+}
+
+function loadViewMode(): ViewMode {
+  try {
+    const saved = localStorage.getItem(VIEW_MODE_KEY);
+    if (saved && (saved === "text" || saved === "chart" || saved === "split")) {
+      return saved as ViewMode;
+    }
+  } catch (error) {
+    console.error("加载视图模式失败:", error);
+  }
+  return "text";
+}
+
+function saveViewMode(mode: ViewMode) {
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  } catch (error) {
+    console.error("保存视图模式失败:", error);
+  }
+}
+
+function loadSplitRatio(): number {
+  try {
+    const saved = localStorage.getItem(SPLIT_RATIO_KEY);
+    if (saved) {
+      const ratio = parseFloat(saved);
+      if (!isNaN(ratio) && ratio >= 0 && ratio <= 1) {
+        return ratio;
+      }
+    }
+  } catch (error) {
+    console.error("加载分屏比例失败:", error);
+  }
+  return 0.4; // 默认 40% 文本，60% 图表
+}
+
+function saveSplitRatio(ratio: number) {
+  try {
+    localStorage.setItem(SPLIT_RATIO_KEY, ratio.toString());
+  } catch (error) {
+    console.error("保存分屏比例失败:", error);
+  }
+}
 
 interface RttState {
   // RTT 连接状态
@@ -29,6 +99,19 @@ interface RttState {
   displayMode: "text" | "hex"; // 新增：显示模式
   colorParserConfig: ColorParserConfig; // 新增：颜色解析配置
 
+  // 视图模式
+  viewMode: ViewMode; // 视图模式：仅文本/仅图表/分屏
+  splitRatio: number; // 分屏比例（0-1，表示文本区域占比）
+
+  // 图表数据
+  chartData: ChartDataPoint[]; // 图表数据点
+  chartConfig: ChartConfig; // 图表配置
+  chartPaused: boolean; // 图表是否暂停更新
+
+  // 统计信息
+  parseSuccessCount: number; // 解析成功次数
+  parseFailCount: number; // 解析失败次数
+
   // 配置
   scanMode: RttScanMode;
   scanAddress: number;
@@ -54,6 +137,15 @@ interface RttState {
   setSearchQuery: (query: string) => void;
   setDisplayMode: (mode: "text" | "hex") => void; // 新增
   setColorParserConfig: (config: ColorParserConfig) => void; // 新增
+  setViewMode: (mode: ViewMode) => void; // 新增：设置视图模式
+  setSplitRatio: (ratio: number) => void; // 新增：设置分屏比例
+  setChartConfig: (config: ChartConfig) => void; // 新增：设置图表配置
+  addChartData: (data: ChartDataPoint) => void; // 新增：添加图表数据
+  clearChartData: () => void; // 新增：清空图表数据
+  setChartPaused: (paused: boolean) => void; // 新增：设置图表暂停状态
+  updateChartSeries: (series: ChartSeries[]) => void; // 新增：更新图表系列
+  incrementParseSuccess: () => void; // 新增：增加解析成功计数
+  incrementParseFail: () => void; // 新增：增加解析失败计数
   setScanMode: (mode: RttScanMode) => void;
   setScanAddress: (address: number) => void;
   setPollInterval: (interval: number) => void;
@@ -93,6 +185,13 @@ export const useRttStore = create<RttState>((set) => ({
   searchQuery: "",
   displayMode: "text", // 新增：默认文本模式
   colorParserConfig: loadColorParserConfig(), // 新增：从 localStorage 加载配置
+  viewMode: loadViewMode(), // 新增：从 localStorage 加载视图模式
+  splitRatio: loadSplitRatio(), // 新增：从 localStorage 加载分屏比例
+  chartData: [], // 新增：图表数据
+  chartConfig: loadChartConfig(), // 新增：从 localStorage 加载图表配置
+  chartPaused: false, // 新增：图表暂停状态
+  parseSuccessCount: 0, // 新增：解析成功计数
+  parseFailCount: 0, // 新增：解析失败计数
   scanMode: "auto",
   scanAddress: 0x20000000,
   pollInterval: 10, // 默认 10ms，更快的轮询
@@ -146,6 +245,45 @@ export const useRttStore = create<RttState>((set) => ({
     saveColorParserConfig(colorParserConfig); // 保存到 localStorage
     set({ colorParserConfig });
   },
+
+  setViewMode: (viewMode) => {
+    saveViewMode(viewMode);
+    set({ viewMode });
+  },
+
+  setSplitRatio: (splitRatio) => {
+    saveSplitRatio(splitRatio);
+    set({ splitRatio });
+  },
+
+  setChartConfig: (chartConfig) => {
+    saveChartConfig(chartConfig);
+    set({ chartConfig });
+  },
+
+  addChartData: (data) =>
+    set((state) => {
+      if (state.chartPaused) return state;
+      const newData = [...state.chartData, data];
+      // 限制最大数据点数
+      const trimmedData = newData.slice(-state.chartConfig.maxDataPoints);
+      return { chartData: trimmedData };
+    }),
+
+  clearChartData: () => set({ chartData: [], parseSuccessCount: 0, parseFailCount: 0 }),
+
+  setChartPaused: (chartPaused) => set({ chartPaused }),
+
+  updateChartSeries: (series) =>
+    set((state) => ({
+      chartConfig: { ...state.chartConfig, series },
+    })),
+
+  incrementParseSuccess: () =>
+    set((state) => ({ parseSuccessCount: state.parseSuccessCount + 1 })),
+
+  incrementParseFail: () =>
+    set((state) => ({ parseFailCount: state.parseFailCount + 1 })),
 
   setScanMode: (scanMode) => set({ scanMode }),
 

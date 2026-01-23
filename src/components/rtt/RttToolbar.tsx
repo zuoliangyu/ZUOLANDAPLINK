@@ -18,9 +18,14 @@ import {
   Binary,
   Link,
   Unlink,
+  SplitSquareHorizontal,
+  BarChart3,
+  Sparkles,
 } from "lucide-react";
 import { ColorSettingsDialog } from "./ColorSettingsDialog";
+import { ChartConfigDialog } from "./ChartConfigDialog";
 import { useEffect } from "react";
+import { detectDataFormat, applyAutoConfig } from "@/lib/chartAutoConfig";
 
 export function RttToolbar() {
   const {
@@ -31,9 +36,12 @@ export function RttToolbar() {
     autoScroll,
     searchQuery: rttSearchQuery, // 重命名避免冲突
     displayMode,
+    viewMode,
     scanMode,
     scanAddress,
     pollInterval,
+    lines,
+    chartConfig,
     setRttConnected,
     setRttConnecting,
     setRunning,
@@ -41,8 +49,10 @@ export function RttToolbar() {
     setAutoScroll,
     setSearchQuery,
     setDisplayMode,
+    setViewMode,
     setChannels,
     clearLines,
+    setChartConfig,
   } = useRttStore();
 
   const addLog = useLogStore((state) => state.addLog);
@@ -200,6 +210,39 @@ export function RttToolbar() {
     addLog("success", `已导出 ${lines.length} 行数据`);
   };
 
+  // 智能启用图表
+  const handleSmartEnableChart = () => {
+    if (lines.length === 0) {
+      addLog("warn", "没有数据可分析，请先启动 RTT 并接收一些数据");
+      return;
+    }
+
+    // 取最近的 20 行数据作为样本
+    const sampleSize = Math.min(20, lines.length);
+    const sampleLines = lines.slice(-sampleSize).map((line) => line.text);
+
+    // 检测数据格式
+    const result = detectDataFormat(sampleLines);
+
+    if (result.confidence < 0.5) {
+      addLog("warn", `无法识别数据格式（置信度: ${(result.confidence * 100).toFixed(0)}%）`);
+      addLog("info", "请手动配置图表或确保数据格式正确");
+      return;
+    }
+
+    // 应用自动配置
+    const newConfig = applyAutoConfig(chartConfig, result);
+    setChartConfig(newConfig);
+
+    // 切换到分屏或图表视图
+    if (viewMode === "text") {
+      setViewMode("split");
+    }
+
+    addLog("success", result.description);
+    addLog("info", `已自动配置 ${result.detectedKeys.length} 个数据系列`);
+  };
+
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
       {/* RTT 连接/断开按钮 */}
@@ -300,6 +343,55 @@ export function RttToolbar() {
           </>
         )}
       </Button>
+
+      <div className="w-px h-5 bg-border" />
+
+      {/* 视图模式切换 */}
+      <div className="flex gap-1">
+        <Button
+          size="sm"
+          variant={viewMode === "text" ? "secondary" : "outline"}
+          onClick={() => setViewMode("text")}
+          className="gap-1"
+          title="仅文本"
+        >
+          <FileText className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant={viewMode === "split" ? "secondary" : "outline"}
+          onClick={() => setViewMode("split")}
+          className="gap-1"
+          title="分屏显示"
+        >
+          <SplitSquareHorizontal className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant={viewMode === "chart" ? "secondary" : "outline"}
+          onClick={() => setViewMode("chart")}
+          className="gap-1"
+          title="仅图表"
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* 智能启用图表按钮 */}
+      <Button
+        size="sm"
+        variant={chartConfig.enabled ? "secondary" : "outline"}
+        onClick={handleSmartEnableChart}
+        disabled={lines.length === 0}
+        className="gap-1"
+        title="智能检测数据格式并自动配置图表"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        智能启用
+      </Button>
+
+      {/* 图表配置按钮 */}
+      <ChartConfigDialog />
 
       <div className="flex-1" />
 
