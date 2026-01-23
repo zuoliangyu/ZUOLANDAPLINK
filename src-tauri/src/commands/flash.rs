@@ -1,10 +1,46 @@
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use probe_rs::flashing::{download_file_with_options, erase_all, FlashProgress, Format, DownloadOptions, BinOptions};
+use probe_rs::flashing::{download_file_with_options, erase_all, FlashProgress, ProgressEvent, Format, DownloadOptions, BinOptions};
 use probe_rs::MemoryInterface;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State, Window};
+
+/// 进度跟踪状态
+#[derive(Debug)]
+struct ProgressState {
+    erase_total: u64,
+    erase_current: u64,
+    program_total: u64,
+    program_current: u64,
+}
+
+impl ProgressState {
+    fn new() -> Self {
+        Self {
+            erase_total: 0,
+            erase_current: 0,
+            program_total: 0,
+            program_current: 0,
+        }
+    }
+
+    /// 计算总体进度 (0.0 - 1.0)
+    /// 擦除: 0-30%, 编程: 30-95%, 完成: 95-100%
+    fn calculate_progress(&self) -> f32 {
+        if self.program_total > 0 {
+            // 编程阶段: 30% - 95%
+            0.30 + (self.program_current as f32 / self.program_total as f32) * 0.65
+        } else if self.erase_total > 0 {
+            // 擦除阶段: 0% - 30%
+            (self.erase_current as f32 / self.erase_total as f32) * 0.30
+        } else {
+            0.0
+        }
+    }
+}
+
 
 /// 擦除模式
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -51,62 +87,6 @@ pub async fn flash_firmware(
         return Err(AppError::FileError("文件不存在".to_string()));
     }
 
-    // 创建进度回调 (当前API版本不支持自定义进度回调)
-    let window_clone = window.clone();
-    let _progress_callback = FlashProgress::new(move |event| {
-        let (phase, progress, message) = match event {
-            probe_rs::flashing::ProgressEvent::Initialized { .. } => {
-                ("init".to_string(), 0.0, "初始化Flash编程器".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::StartedFilling => {
-                ("fill".to_string(), 0.0, "开始填充数据".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::PageFilled { size, .. } => {
-                ("fill".to_string(), 0.5, format!("已填充 {} 字节", size))
-            }
-            probe_rs::flashing::ProgressEvent::FailedFilling => {
-                ("fill".to_string(), 0.0, "填充失败".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::FinishedFilling => {
-                ("fill".to_string(), 1.0, "填充完成".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::StartedErasing => {
-                ("erase".to_string(), 0.0, "开始擦除".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::SectorErased { size, .. } => {
-                ("erase".to_string(), 0.5, format!("已擦除 {} 字节", size))
-            }
-            probe_rs::flashing::ProgressEvent::FailedErasing => {
-                ("erase".to_string(), 0.0, "擦除失败".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::FinishedErasing => {
-                ("erase".to_string(), 1.0, "擦除完成".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::StartedProgramming { length } => {
-                ("program".to_string(), 0.0, format!("开始编程 {} 字节", length))
-            }
-            probe_rs::flashing::ProgressEvent::PageProgrammed { size, .. } => {
-                ("program".to_string(), 0.5, format!("已编程 {} 字节", size))
-            }
-            probe_rs::flashing::ProgressEvent::FailedProgramming => {
-                ("program".to_string(), 0.0, "编程失败".to_string())
-            }
-            probe_rs::flashing::ProgressEvent::FinishedProgramming => {
-                ("program".to_string(), 1.0, "编程完成".to_string())
-            }
-            _ => ("unknown".to_string(), 0.0, "处理中".to_string()),
-        };
-
-        let _ = window_clone.emit(
-            "flash-progress",
-            FlashProgressEvent {
-                phase,
-                progress,
-                message,
-            },
-        );
-    });
-
     // 根据文件扩展名确定格式
     let format = match path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
         Some("hex") | Some("ihex") => Format::Hex,
@@ -148,6 +128,77 @@ pub async fn flash_firmware(
         }
     }
     download_options.verify = options.verify;
+
+    // 创建并设置进度回调
+    let progress_state = Arc::new(Mutex::new(ProgressState::new()));
+    let window_clone = window.clone();
+    let progress_state_clone = Arc::clone(&progress_state);
+
+    let progress_callback = FlashProgress::new(move |event| {
+        let mut state = progress_state_clone.lock().unwrap();
+
+        let (phase, message) = match event {
+            ProgressEvent::Initialized { .. } => {
+                ("init".to_string(), "初始化Flash编程器".to_string())
+            }
+            ProgressEvent::StartedFilling => {
+                ("fill".to_string(), "开始填充数据".to_string())
+            }
+            ProgressEvent::PageFilled { size, .. } => {
+                ("fill".to_string(), format!("已填充 {} 字节", size))
+            }
+            ProgressEvent::FailedFilling => {
+                ("fill".to_string(), "填充失败".to_string())
+            }
+            ProgressEvent::FinishedFilling => {
+                ("fill".to_string(), "填充完成".to_string())
+            }
+            ProgressEvent::StartedErasing => {
+                state.erase_current = 0;
+                ("erase".to_string(), "开始擦除".to_string())
+            }
+            ProgressEvent::SectorErased { size, .. } => {
+                state.erase_current += size as u64;
+                state.erase_total = state.erase_current.max(state.erase_total);
+                ("erase".to_string(), format!("已擦除 {} 字节", state.erase_current))
+            }
+            ProgressEvent::FailedErasing => {
+                ("erase".to_string(), "擦除失败".to_string())
+            }
+            ProgressEvent::FinishedErasing => {
+                ("erase".to_string(), "擦除完成".to_string())
+            }
+            ProgressEvent::StartedProgramming { length } => {
+                state.program_total = length as u64;
+                state.program_current = 0;
+                ("program".to_string(), format!("开始编程 {} 字节", length))
+            }
+            ProgressEvent::PageProgrammed { size, .. } => {
+                state.program_current += size as u64;
+                ("program".to_string(), format!("已编程 {}/{} 字节", state.program_current, state.program_total))
+            }
+            ProgressEvent::FailedProgramming => {
+                ("program".to_string(), "编程失败".to_string())
+            }
+            ProgressEvent::FinishedProgramming => {
+                ("program".to_string(), "编程完成".to_string())
+            }
+            _ => return,
+        };
+
+        let progress = state.calculate_progress();
+
+        let _ = window_clone.emit(
+            "flash-progress",
+            FlashProgressEvent {
+                phase,
+                progress,
+                message,
+            },
+        );
+    });
+
+    download_options.progress = Some(progress_callback);
 
     // 执行下载
     download_file_with_options(session, path, format, download_options)

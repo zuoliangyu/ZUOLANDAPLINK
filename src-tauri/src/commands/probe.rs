@@ -223,9 +223,20 @@ pub async fn connect_target(
 
 #[tauri::command]
 pub async fn disconnect(state: State<'_, AppState>) -> AppResult<()> {
-    let mut session_guard = state.session.lock();
-    *session_guard = None;
+    // 简单地释放session，让probe-rs自动处理清理
+    {
+        let mut session_guard = state.session.lock();
+        if let Some(session) = session_guard.as_mut() {
+            // 尝试让芯片恢复运行（不做复位操作，避免触发probe-rs的bug）
+            if let Ok(mut core) = session.core(0) {
+                let _ = core.run();
+            }
+        }
+        // 释放session，这会自动关闭探针
+        *session_guard = None;
+    }
 
+    // 清除连接信息
     let mut conn_info = state.connection_info.lock();
     *conn_info = None;
 

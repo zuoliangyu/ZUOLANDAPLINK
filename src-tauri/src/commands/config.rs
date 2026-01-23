@@ -118,6 +118,8 @@ const BUILTIN_CHIPS: &[&str] = &[
     "GD32F405RGT6", "GD32F405VGT6", "GD32F405ZGT6",
     "GD32F407RET6", "GD32F407RGT6", "GD32F407VET6", "GD32F407VGT6",
     "GD32F407ZET6", "GD32F407ZGT6", "GD32F450VGT6", "GD32F450ZGT6",
+    "GD32F470VGT6", "GD32F470VIT6", "GD32F470ZGT6", "GD32F470ZIT6",
+    "GD32F470IGT6", "GD32F470IIT6",
     // GD32E
     "GD32E103C8T6", "GD32E103CBT6", "GD32E103RBT6", "GD32E103RCT6",
     "GD32E230C8T6", "GD32E230F8P6", "GD32E230G8U6",
@@ -236,6 +238,13 @@ pub async fn list_imported_packs() -> AppResult<Vec<PackInfo>> {
     let manager = PackManager::new()?;
     let packs = manager.list_packs()?;
     Ok(packs)
+}
+
+#[tauri::command]
+pub async fn delete_pack(pack_name: String) -> AppResult<()> {
+    let manager = PackManager::new()?;
+    manager.delete_pack(&pack_name)?;
+    Ok(())
 }
 
 #[tauri::command]

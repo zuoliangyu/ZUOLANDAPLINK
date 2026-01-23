@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { open } from "@tauri-apps/plugin-dialog";
-import { importPack, listImportedPacks } from "@/lib/tauri";
+import { importPack, listImportedPacks, deletePack } from "@/lib/tauri";
 import type { PackInfo } from "@/lib/types";
 import { useLogStore } from "@/stores/logStore";
 import { Package, Upload, Trash2 } from "lucide-react";
@@ -57,6 +57,22 @@ export function PackManager() {
     }
   };
 
+  // 删除Pack
+  const handleDelete = async (packName: string) => {
+    if (!confirm(`确定要删除Pack "${packName}" 吗？\n\n删除后需要重新导入才能使用。`)) {
+      return;
+    }
+
+    try {
+      addLog("info", `正在删除Pack: ${packName}`);
+      await deletePack(packName);
+      addLog("success", `成功删除Pack: ${packName}`);
+      await loadPacks();
+    } catch (error) {
+      addLog("error", `删除Pack失败: ${error}`);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="py-3">
@@ -105,8 +121,8 @@ export function PackManager() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                  disabled
-                  title="删除功能开发中"
+                  onClick={() => handleDelete(pack.name)}
+                  title="删除Pack"
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>

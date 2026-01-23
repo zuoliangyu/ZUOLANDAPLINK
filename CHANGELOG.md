@@ -5,6 +5,46 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.2] - 2026-01-23
+
+### 改进
+- 🎨 **Flash进度回调优化** - 实现真实的烧录进度跟踪，显示准确的进度百分比和字节数
+- 🎨 优化进度计算逻辑，擦除阶段0-30%，编程阶段30-95%
+- 🎨 显示详细进度信息（如"已编程 32768/65536 字节"）
+
+### 修复
+- 🐛 修复未使用的导入警告（Header.tsx中的FileDown）
+
+### 技术细节
+- 使用 `Arc<Mutex<ProgressState>>` 跟踪累积进度
+- 实现 `ProgressState` 结构体，跟踪擦除和编程阶段的字节数
+- 通过 `DownloadOptions.progress` 设置进度回调
+- 进度回调实时发送事件到前端显示
+
+## [0.3.1] - 2026-01-23
+
+### 新增
+- ✨ **高级擦除对话框** - 点击"擦除Flash"按钮弹出对话框，支持全片擦除和自定义范围擦除
+- ✨ **GD32F470系列支持** - 新增6个GD32F470型号（VGT6/VIT6/ZGT6/ZIT6/IGT6/IIT6）
+- ✨ **EraseDialog组件** - 新增擦除对话框组件 (`src/components/dialogs/EraseDialog.tsx`)
+- ✨ **UI组件扩展** - 新增dialog、label、radio-group基础UI组件
+
+### 改进
+- 🎨 优化工具栏布局，添加"烧录模式:"标签，避免擦除模式选择器混淆
+- 🎨 改进擦除功能，独立擦除操作使用对话框，烧录时擦除使用下拉框
+- 🎨 优化进度显示，显示详细字节数（如"已编程 32768/65536 字节"）
+
+### 修复
+- 🐛 **修复Flash进度条显示错误** - 之前显示5500%，现在正确显示0-100%
+- 🐛 **修复日志面板拖动方向** - 向下拖动面板变高，向上拖动面板变矮（符合直觉）
+
+### 技术细节
+- 使用 `Arc<Mutex<ProgressState>>` 跟踪Flash操作进度状态
+- 根据实际字节数计算进度（填充0-20%，擦除20-50%，编程50-95%）
+- 反转日志面板拖动的deltaY计算
+- 添加依赖：@radix-ui/react-label, @radix-ui/react-radio-group, class-variance-authority
+- 扩展 `handleEraseConfirm` 函数，支持全片擦除和自定义范围擦除
+
 ## [0.3.0] - 2026-01-23
 
 ### 新增
@@ -78,6 +118,8 @@
 
 ---
 
-[0.3.0]: https://github.com/zuolan/ZUOLANDAPLINK/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/zuolan/ZUOLANDAPLINK/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/zuolan/ZUOLANDAPLINK/releases/tag/v0.1.0
+[0.3.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/releases/tag/v0.1.0

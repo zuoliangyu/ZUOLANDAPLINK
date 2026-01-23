@@ -21,7 +21,8 @@ export const useLogStore = create<LogState>((set) => ({
         message,
       };
 
-      const logs = [newLog, ...state.logs].slice(0, state.maxLogs);
+      // 将新日志追加到末尾，保留最后maxLogs条
+      const logs = [...state.logs, newLog].slice(-state.maxLogs);
       return { logs };
     }),
 

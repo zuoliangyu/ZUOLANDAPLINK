@@ -109,6 +109,10 @@ export async function listImportedPacks(): Promise<PackInfo[]> {
   return await invoke<PackInfo[]>("list_imported_packs");
 }
 
+export async function deletePack(packName: string): Promise<void> {
+  return await invoke("delete_pack", { packName });
+}
+
 export async function getFlashAlgorithms(chipName: string): Promise<FlashAlgorithmInfo[]> {
   return await invoke<FlashAlgorithmInfo[]>("get_flash_algorithms", { chipName });
 }

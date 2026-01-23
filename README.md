@@ -2,7 +2,7 @@
 
 一个开源的第三方DAPLINK烧录软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Version](https://img.shields.io/badge/version-0.3.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性
@@ -266,7 +266,6 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 
 ## ⚠️ 已知限制
 
-- 当前版本不支持进度回调显示（probe-rs API限制）
 - ESP32系列需要特殊的烧录流程
 - 部分国产芯片可能需要导入对应的Pack
 - 目标IDCODE读取受probe-rs API限制（需通过Keil等工具查看）
@@ -275,13 +274,19 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 
 查看完整的更新日志请访问 [CHANGELOG.md](CHANGELOG.md)
 
-### 最新版本 v0.3.0 (2026-01-23)
+### 最新版本 v0.3.2 (2026-01-23)
 
-- ✨ CMSIS-Pack导入UI
-- ✨ 自定义ROM地址配置（Keil风格）
-- ✨ 日志面板可拖动调整大小
-- 🎨 优化烧录设置界面
-- 🐛 多项bug修复
+- 🎨 实现真实的Flash烧录进度跟踪，显示准确的进度百分比和字节数
+- 🎨 优化进度计算逻辑，擦除阶段0-30%，编程阶段30-95%
+- 🐛 修复未使用的导入警告
+
+### v0.3.1 (2026-01-23)
+
+- 🐛 修复Flash进度条显示错误（之前显示5500%）
+- 🐛 修复日志面板拖动方向
+- ✨ 高级擦除对话框（全片擦除/自定义范围擦除）
+- ✨ 新增GD32F470系列支持（6个型号）
+- 🎨 优化工具栏布局，添加"烧录模式"标签
 
 [查看完整更新日志 →](CHANGELOG.md)
 

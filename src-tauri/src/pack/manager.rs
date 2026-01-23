@@ -124,4 +124,17 @@ impl PackManager {
     pub fn get_pack_dir(&self, pack_name: &str) -> PathBuf {
         self.packs_dir.join(pack_name)
     }
+
+    pub fn delete_pack(&self, pack_name: &str) -> AppResult<()> {
+        let pack_dir = self.get_pack_dir(pack_name);
+
+        if !pack_dir.exists() {
+            return Err(AppError::PackError(format!("Pack不存在: {}", pack_name)));
+        }
+
+        fs::remove_dir_all(&pack_dir)
+            .map_err(|e| AppError::PackError(format!("删除Pack失败: {}", e)))?;
+
+        Ok(())
+    }
 }

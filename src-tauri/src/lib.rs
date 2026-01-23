@@ -47,6 +47,7 @@ pub fn run() {
             config::get_chip_info,
             config::import_pack,
             config::list_imported_packs,
+            config::delete_pack,
             config::get_flash_algorithms,
             config::save_project_config,
             config::load_project_config,

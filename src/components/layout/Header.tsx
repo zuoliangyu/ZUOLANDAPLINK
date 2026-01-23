@@ -4,7 +4,6 @@ import {
   Unlock,
   Download,
   Trash2,
-  FileDown,
   CheckCircle,
   Upload,
   Zap,
@@ -25,10 +24,11 @@ import { useProbeStore } from "@/stores/probeStore";
 import { useFlashStore } from "@/stores/flashStore";
 import { useLogStore } from "@/stores/logStore";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { flashFirmware, eraseChip, verifyFirmware, readFlash } from "@/lib/tauri";
+import { flashFirmware, eraseChip, eraseSector, verifyFirmware, readFlash } from "@/lib/tauri";
 import { listen } from "@tauri-apps/api/event";
 import type { FlashProgressEvent, EraseMode } from "@/lib/types";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { EraseDialog } from "@/components/dialogs/EraseDialog";
 
 interface ToolbarButtonProps {
   icon: React.ReactNode;
@@ -78,6 +78,7 @@ export function Header() {
     setEraseMode,
   } = useFlashStore();
   const addLog = useLogStore((state) => state.addLog);
+  const [eraseDialogOpen, setEraseDialogOpen] = useState(false);
 
   useEffect(() => {
     const unlisten = listen<FlashProgressEvent>("flash-progress", (event) => {
@@ -153,13 +154,23 @@ export function Header() {
       addLog("error", "请先连接设备");
       return;
     }
+    // 显示擦除对话框
+    setEraseDialogOpen(true);
+  };
 
+  const handleEraseConfirm = async (mode: "full" | "custom", address?: number, size?: number) => {
     try {
       setFlashing(true);
-      const modeLabel = eraseMode === "ChipErase" ? "全片擦除" : "扇区擦除";
-      addLog("info", `开始${modeLabel}`);
-      await eraseChip(eraseMode);
-      addLog("success", `${modeLabel}完成`);
+
+      if (mode === "full") {
+        addLog("info", "开始全片擦除");
+        await eraseChip();
+        addLog("success", "全片擦除完成");
+      } else if (mode === "custom" && address !== undefined && size !== undefined) {
+        addLog("info", `开始擦除 0x${address.toString(16).toUpperCase()} - 0x${(address + size).toString(16).toUpperCase()} (${size} 字节)`);
+        await eraseSector(address, size);
+        addLog("success", "自定义范围擦除完成");
+      }
     } catch (error) {
       addLog("error", `擦除失败: ${error}`);
     } finally {
@@ -246,11 +257,20 @@ export function Header() {
         />
         <ToolbarSeparator />
 
-        {/* 擦除模式选择 */}
+        {/* Flash操作 */}
+        <ToolbarButton
+          icon={<Trash2 className="h-4 w-4" />}
+          label="擦除Flash"
+          disabled={!connected || flashing}
+          onClick={handleErase}
+        />
+
+        {/* 烧录擦除模式选择 */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground">烧录模式:</span>
                 <Select
                   value={eraseMode}
                   onValueChange={(value) => setEraseMode(value as EraseMode)}
@@ -267,28 +287,14 @@ export function Header() {
               </div>
             </TooltipTrigger>
             <TooltipContent>
-              <p>擦除模式：扇区擦除只擦除需要写入的区域，整片擦除会清空整个Flash</p>
+              <p>烧录时的擦除模式：扇区擦除只擦除需要写入的区域（快），整片擦除会清空整个Flash（慢但彻底）</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <ToolbarSeparator />
 
-        {/* Flash操作 */}
         <ToolbarButton
           icon={<Download className="h-4 w-4" />}
-          label="写入Flash"
-          disabled={!connected || flashing || !firmwarePath}
-          onClick={handleFlash}
-        />
-        <ToolbarButton
-          icon={<Trash2 className="h-4 w-4" />}
-          label="擦除Flash"
-          disabled={!connected || flashing}
-          onClick={handleErase}
-        />
-        <ToolbarButton
-          icon={<FileDown className="h-4 w-4" />}
-          label="编程"
+          label="烧录固件"
           disabled={!connected || flashing || !firmwarePath}
           onClick={handleFlash}
         />
@@ -344,6 +350,13 @@ export function Header() {
         />
         <span>{connected ? "已连接" : "未连接"}</span>
       </div>
+
+      {/* 擦除对话框 */}
+      <EraseDialog
+        open={eraseDialogOpen}
+        onOpenChange={setEraseDialogOpen}
+        onConfirm={handleEraseConfirm}
+      />
     </header>
   );
 }

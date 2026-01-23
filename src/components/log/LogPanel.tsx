@@ -32,7 +32,7 @@ export function LogPanel() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
-      const deltaY = startYRef.current - e.clientY; // 向上拖动为正
+      const deltaY = startYRef.current - e.clientY; // 向上拖动为正（手柄在顶部）
       const newHeight = Math.max(80, Math.min(600, startHeightRef.current + deltaY));
       setHeight(newHeight);
     };
