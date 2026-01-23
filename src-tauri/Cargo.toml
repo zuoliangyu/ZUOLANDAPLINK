@@ -1,7 +1,7 @@
 [package]
 name = "zuolandaplink"
-version = "0.2.0"
-description = "DAPLINK烧录工具"
+version = "0.3.0"
+description = "DAPLINK RTTVIEW"
 authors = ["zuolan"]
 edition = "2021"
 

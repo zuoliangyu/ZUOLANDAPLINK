@@ -12,6 +12,10 @@ interface ProbeState {
   loading: boolean;
   error: string | null;
 
+  // 自动断开配置
+  autoDisconnect: boolean;
+  autoDisconnectTimeout: number; // 毫秒
+
   // 操作
   setProbes: (probes: ProbeInfo[]) => void;
   selectProbe: (probe: ProbeInfo | null) => void;
@@ -19,6 +23,8 @@ interface ProbeState {
   setSettings: (settings: Partial<DeviceSettings>) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setAutoDisconnect: (enabled: boolean) => void;
+  setAutoDisconnectTimeout: (timeout: number) => void;
   reset: () => void;
 }
 
@@ -39,6 +45,8 @@ export const useProbeStore = create<ProbeState>((set) => ({
   settings: defaultSettings,
   loading: false,
   error: null,
+  autoDisconnect: true, // 默认启用
+  autoDisconnectTimeout: 10000, // 默认10秒
 
   setProbes: (probes) => set({ probes }),
 
@@ -53,6 +61,10 @@ export const useProbeStore = create<ProbeState>((set) => ({
   setLoading: (loading) => set({ loading }),
 
   setError: (error) => set({ error }),
+
+  setAutoDisconnect: (autoDisconnect) => set({ autoDisconnect }),
+
+  setAutoDisconnectTimeout: (autoDisconnectTimeout) => set({ autoDisconnectTimeout }),
 
   reset: () =>
     set({

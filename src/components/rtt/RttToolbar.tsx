@@ -12,6 +12,8 @@ import {
   Download,
   ArrowDown,
   Search,
+  FileText,
+  Binary,
 } from "lucide-react";
 
 export function RttToolbar() {
@@ -20,6 +22,7 @@ export function RttToolbar() {
     isPaused,
     autoScroll,
     searchQuery,
+    displayMode,
     scanMode,
     scanAddress,
     pollInterval,
@@ -27,6 +30,7 @@ export function RttToolbar() {
     setPaused,
     setAutoScroll,
     setSearchQuery,
+    setDisplayMode,
     setChannels,
     clearLines,
   } = useRttStore();
@@ -170,6 +174,26 @@ export function RttToolbar() {
       >
         <ArrowDown className="h-3.5 w-3.5" />
         自动滚动
+      </Button>
+
+      {/* 显示模式切换 */}
+      <Button
+        size="sm"
+        variant={displayMode === "hex" ? "secondary" : "outline"}
+        onClick={() => setDisplayMode(displayMode === "text" ? "hex" : "text")}
+        className="gap-1"
+      >
+        {displayMode === "hex" ? (
+          <>
+            <Binary className="h-3.5 w-3.5" />
+            Hex
+          </>
+        ) : (
+          <>
+            <FileText className="h-3.5 w-3.5" />
+            文本
+          </>
+        )}
       </Button>
 
       <div className="flex-1" />

@@ -20,6 +20,7 @@ interface RttState {
   autoScroll: boolean;
   showTimestamp: boolean;
   searchQuery: string;
+  displayMode: "text" | "hex"; // 新增：显示模式
 
   // 配置
   scanMode: RttScanMode;
@@ -42,6 +43,7 @@ interface RttState {
   setAutoScroll: (enabled: boolean) => void;
   setShowTimestamp: (show: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setDisplayMode: (mode: "text" | "hex") => void; // 新增
   setScanMode: (mode: RttScanMode) => void;
   setScanAddress: (address: number) => void;
   setPollInterval: (interval: number) => void;
@@ -77,6 +79,7 @@ export const useRttStore = create<RttState>((set) => ({
   autoScroll: true,
   showTimestamp: true,
   searchQuery: "",
+  displayMode: "text", // 新增：默认文本模式
   scanMode: "auto",
   scanAddress: 0x20000000,
   pollInterval: 10, // 默认 10ms，更快的轮询
@@ -120,6 +123,8 @@ export const useRttStore = create<RttState>((set) => ({
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
 
+  setDisplayMode: (displayMode) => set({ displayMode }), // 新增
+
   setScanMode: (scanMode) => set({ scanMode }),
 
   setScanAddress: (scanAddress) => set({ scanAddress }),
@@ -147,32 +152,47 @@ export function parseRttData(
   data: number[],
   channel: number,
   timestamp: number,
-  pendingBuffer: Map<number, string>
+  pendingBuffer: Map<number, { text: string; rawData: number[] }>
 ): Omit<RttLine, "id">[] {
   const lines: Omit<RttLine, "id">[] = [];
   const text = new TextDecoder().decode(new Uint8Array(data));
   const date = new Date(timestamp);
 
   // 获取该通道的未完成行
-  const pending = pendingBuffer.get(channel) || "";
-  const fullText = pending + text;
+  const pending = pendingBuffer.get(channel) || { text: "", rawData: [] };
+  const fullText = pending.text + text;
+  const fullRawData = [...pending.rawData, ...data];
 
   // 按换行符分割
   const parts = fullText.split(/\r?\n/);
 
   // 最后一部分可能是不完整的行
   const lastPart = parts.pop() || "";
-  pendingBuffer.set(channel, lastPart);
+
+  // 计算最后一部分的字节长度
+  const lastPartBytes = new TextEncoder().encode(lastPart);
+  const lastRawData = fullRawData.slice(-lastPartBytes.length);
+  pendingBuffer.set(channel, { text: lastPart, rawData: lastRawData });
 
   // 处理完整的行
+  let currentOffset = 0;
   for (const part of parts) {
     if (part.trim()) {
+      // 计算这一行的字节数据
+      const lineBytes = new TextEncoder().encode(part);
+      const lineRawData = fullRawData.slice(currentOffset, currentOffset + lineBytes.length);
+
       lines.push({
         channel,
         timestamp: date,
         text: part,
         level: parseLogLevel(part),
+        rawData: lineRawData,
       });
+
+      currentOffset += lineBytes.length + 1; // +1 for newline
+    } else {
+      currentOffset += 1; // empty line, just skip newline
     }
   }
 

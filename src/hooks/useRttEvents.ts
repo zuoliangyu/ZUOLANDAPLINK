@@ -9,7 +9,7 @@ import type { RttDataEvent, RttStatusEvent } from "@/lib/types";
  */
 export function useRttEvents() {
   const { addLines, addBytes, setRunning, setError } = useRttStore();
-  const pendingBufferRef = useRef<Map<number, string>>(new Map());
+  const pendingBufferRef = useRef<Map<number, { text: string; rawData: number[] }>>(new Map());
 
   useEffect(() => {
     // 监听 RTT 数据事件

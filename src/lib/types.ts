@@ -5,6 +5,7 @@ export interface ProbeInfo {
   product_id: number;
   serial_number: string | null;
   probe_type: string;
+  dap_version: string | null;
 }
 
 // 连接选项
@@ -41,9 +42,11 @@ export interface ConnectionStatus {
 
 export interface ConnectionInfo {
   probe_name: string;
+  probe_serial: string | null;  // DAP探针序列号
   target_name: string;
   core_type: string;
-  chip_id: number | null;
+  chip_id: number | null;        // 芯片DBGMCU_IDCODE
+  target_idcode: number | null;  // 目标芯片的真实IDCODE
 }
 
 // 芯片信息
@@ -163,6 +166,7 @@ export interface RttLine {
   timestamp: Date;
   text: string;
   level: "info" | "warn" | "error" | "debug";
+  rawData?: number[]; // 新增：原始字节数据
 }
 
 // 寄存器值

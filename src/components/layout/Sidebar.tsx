@@ -14,6 +14,7 @@ import { useProbeStore } from "@/stores/probeStore";
 import { useChipStore } from "@/stores/chipStore";
 import { useLogStore } from "@/stores/logStore";
 import { listProbes, connectTarget, disconnect, searchChips, getChipInfo } from "@/lib/tauri";
+import { PackManager } from "@/components/config/PackManager";
 
 export function Sidebar() {
   const {
@@ -23,12 +24,16 @@ export function Sidebar() {
     connectionInfo,
     settings,
     loading,
+    autoDisconnect,
+    autoDisconnectTimeout,
     setProbes,
     selectProbe,
     setConnected,
     setSettings,
     setLoading,
     setError,
+    setAutoDisconnect,
+    setAutoDisconnectTimeout,
   } = useProbeStore();
 
   const {
@@ -80,12 +85,11 @@ export function Sidebar() {
         connect_mode: settings.connectMode === "Normal" ? "Normal" : "UnderReset",
       });
 
-      setConnected(true, {
-        probe_name: selectedProbe.identifier,
-        target_name: selectedChip,
-        core_type: targetInfo.core_type,
-        chip_id: targetInfo.chip_id,
-      }, targetInfo);
+      // 从后端获取完整的连接信息
+      const { getConnectionStatus } = await import("@/lib/tauri");
+      const status = await getConnectionStatus();
+
+      setConnected(true, status.info, targetInfo);
 
       addLog("success", `已连接到 ${selectedChip}`);
     } catch (error) {
@@ -177,7 +181,14 @@ export function Sidebar() {
             <SelectContent>
               {probes.map((probe) => (
                 <SelectItem key={probe.identifier} value={probe.identifier}>
-                  {probe.identifier}
+                  <div className="flex flex-col">
+                    <span>{probe.identifier}</span>
+                    {probe.dap_version && (
+                      <span className="text-xs text-muted-foreground">
+                        {probe.dap_version}
+                      </span>
+                    )}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -214,6 +225,9 @@ export function Sidebar() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pack管理 */}
+      <PackManager />
 
       {/* 接口设置 */}
       <Card>
@@ -303,6 +317,53 @@ export function Sidebar() {
         </CardContent>
       </Card>
 
+      {/* 自动断开设置 */}
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm">自动断开</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-muted-foreground">启用自动断开</label>
+            <Button
+              size="sm"
+              variant={autoDisconnect ? "secondary" : "outline"}
+              onClick={() => setAutoDisconnect(!autoDisconnect)}
+              className="h-7 text-xs"
+            >
+              {autoDisconnect ? "已启用" : "已禁用"}
+            </Button>
+          </div>
+
+          {autoDisconnect && (
+            <div>
+              <label className="text-xs text-muted-foreground">超时时间（秒）</label>
+              <Select
+                value={String(autoDisconnectTimeout / 1000)}
+                onValueChange={(value) =>
+                  setAutoDisconnectTimeout(parseInt(value) * 1000)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 秒</SelectItem>
+                  <SelectItem value="10">10 秒</SelectItem>
+                  <SelectItem value="30">30 秒</SelectItem>
+                  <SelectItem value="60">60 秒</SelectItem>
+                  <SelectItem value="120">120 秒</SelectItem>
+                  <SelectItem value="300">300 秒</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                无操作超时后自动断开连接（RTT运行时不会断开）
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* 连接按钮 */}
       <Button
         className="w-full"
@@ -329,6 +390,18 @@ export function Sidebar() {
             <CardTitle className="text-sm">连接信息</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-xs">
+            {selectedProbe?.dap_version && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">DAP版本:</span>
+                <span>{selectedProbe.dap_version}</span>
+              </div>
+            )}
+            {connectionInfo.probe_serial && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">DAP序列号:</span>
+                <span className="font-mono text-[10px]">{connectionInfo.probe_serial}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">目标:</span>
               <span>{connectionInfo.target_name}</span>
@@ -345,6 +418,9 @@ export function Sidebar() {
                 </span>
               </div>
             )}
+            <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t">
+              注：目标IDCODE需通过Keil等工具查看
+            </div>
           </CardContent>
         </Card>
       )}

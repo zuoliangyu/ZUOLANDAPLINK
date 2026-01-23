@@ -12,9 +12,22 @@ import { Cpu, HardDrive, Layers, Settings, Terminal } from "lucide-react";
 export function MainArea() {
   const { connected, targetInfo } = useProbeStore();
   const { chipInfo } = useChipStore();
-  const { flashing, progress, message, firmwarePath, verifyAfterFlash, resetAfterFlash } = useFlashStore();
+  const {
+    flashing,
+    progress,
+    message,
+    firmwarePath,
+    verifyAfterFlash,
+    resetAfterFlash,
+    useCustomAddress,
+    customFlashAddress,
+    customFlashSize
+  } = useFlashStore();
   const setVerifyAfterFlash = useFlashStore((state) => state.setVerifyAfterFlash);
   const setResetAfterFlash = useFlashStore((state) => state.setResetAfterFlash);
+  const setUseCustomAddress = useFlashStore((state) => state.setUseCustomAddress);
+  const setCustomFlashAddress = useFlashStore((state) => state.setCustomFlashAddress);
+  const setCustomFlashSize = useFlashStore((state) => state.setCustomFlashSize);
 
   const [activeTab, setActiveTab] = useState<string>("info");
 
@@ -201,6 +214,88 @@ export function MainArea() {
                         onChange={(e) => setResetAfterFlash(e.target.checked)}
                         className="h-4 w-4"
                       />
+                    </div>
+
+                    <div className="border-t border-border mt-3 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-muted-foreground">自定义ROM地址</span>
+                        <input
+                          type="checkbox"
+                          checked={useCustomAddress}
+                          onChange={(e) => setUseCustomAddress(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                      </div>
+
+                      {useCustomAddress && (
+                        <div className="space-y-2 mt-2">
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs text-muted-foreground">
+                                IROM1 起始地址
+                              </label>
+                              {chipInfo && chipInfo.memory_regions.length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const flashRegion = chipInfo.memory_regions.find(r => r.kind === "Flash");
+                                    if (flashRegion) {
+                                      setCustomFlashAddress(flashRegion.address);
+                                      setCustomFlashSize(flashRegion.size);
+                                    }
+                                  }}
+                                  className="text-xs text-blue-500 hover:text-blue-400"
+                                >
+                                  使用芯片默认值
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={`0x${customFlashAddress.toString(16).toUpperCase().padStart(8, '0')}`}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/^0x/i, '');
+                                const parsed = parseInt(value, 16);
+                                if (!isNaN(parsed)) {
+                                  setCustomFlashAddress(parsed);
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-xs font-mono bg-background border border-border rounded"
+                              placeholder="0x08000000"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs text-muted-foreground block mb-1">
+                              IROM1 大小
+                            </label>
+                            <input
+                              type="text"
+                              value={`0x${customFlashSize.toString(16).toUpperCase()}`}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/^0x/i, '');
+                                const parsed = parseInt(value, 16);
+                                if (!isNaN(parsed)) {
+                                  setCustomFlashSize(parsed);
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-xs font-mono bg-background border border-border rounded"
+                              placeholder="0x100000"
+                            />
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {customFlashSize > 0 ? `${formatBytes(customFlashSize)} (${customFlashSize} 字节)` : '未设置'}
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                            <div className="font-medium mb-1">参考 (Keil风格):</div>
+                            <div>• IROM1: 0x08000000, 0x100000 (1MB)</div>
+                            <div>• IRAM1: 0x20000000, 0x1C000 (112KB)</div>
+                            <div className="mt-1 text-[10px]">
+                              注：烧录时仅需配置ROM区域
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

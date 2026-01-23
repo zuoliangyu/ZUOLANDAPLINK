@@ -73,9 +73,11 @@ impl AppState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo {
     pub probe_name: String,
+    pub probe_serial: Option<String>,  // 新增：DAP探针序列号
     pub target_name: String,
     pub core_type: String,
-    pub chip_id: Option<u32>,
+    pub chip_id: Option<u32>,          // 芯片DBGMCU_IDCODE
+    pub target_idcode: Option<u32>,    // 新增：目标芯片的真实IDCODE（通过SWD读取）
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

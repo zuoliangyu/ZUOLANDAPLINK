@@ -1,18 +1,56 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useLogStore } from "@/stores/logStore";
 import { formatTime } from "@/lib/utils";
-import { Trash2 } from "lucide-react";
+import { Trash2, GripHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function LogPanel() {
   const { logs, clearLogs } = useLogStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(128); // 默认高度128px
+  const [isResizing, setIsResizing] = useState(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
 
+  // 自动滚动到底部（最新日志）
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [logs]);
+
+  // 开始拖动
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    startYRef.current = e.clientY;
+    startHeightRef.current = height;
+    e.preventDefault();
+  };
+
+  // 拖动中
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const deltaY = startYRef.current - e.clientY; // 向上拖动为正
+      const newHeight = Math.max(80, Math.min(600, startHeightRef.current + deltaY));
+      setHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -41,7 +79,19 @@ export function LogPanel() {
   };
 
   return (
-    <div className="h-32 border-t border-border bg-muted/30">
+    <div style={{ height: `${height}px` }} className="border-t border-border bg-muted/30 relative">
+      {/* 拖动手柄 */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-primary/20 transition-colors ${
+          isResizing ? "bg-primary/30" : ""
+        }`}
+        onMouseDown={handleMouseDown}
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <GripHorizontal className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+
       <div className="flex items-center justify-between px-3 py-1 border-b border-border">
         <span className="text-xs font-medium">输出日志</span>
         <Button
@@ -55,7 +105,8 @@ export function LogPanel() {
       </div>
       <div
         ref={scrollRef}
-        className="h-[calc(100%-28px)] overflow-y-auto p-2 font-mono text-xs"
+        className="overflow-y-auto p-2 font-mono text-xs"
+        style={{ height: `calc(100% - 28px)` }}
       >
         {logs.map((log) => (
           <div key={log.id} className="flex gap-2 py-0.5">

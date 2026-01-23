@@ -22,6 +22,10 @@ pub struct FlashOptions {
     pub reset_after: bool,
     #[serde(default)]
     pub erase_mode: EraseMode,
+    // 自定义烧录地址
+    pub use_custom_address: Option<bool>,
+    pub custom_flash_address: Option<u64>,
+    pub custom_flash_size: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -107,16 +111,22 @@ pub async fn flash_firmware(
     let format = match path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
         Some("hex") | Some("ihex") => Format::Hex,
         Some("bin") => {
-            // BIN文件需要指定基地址，默认使用Flash起始地址
-            let base_address = session.target().memory_map.iter()
-                .find_map(|region| {
-                    if let probe_rs::config::MemoryRegion::Nvm(r) = region {
-                        Some(r.range.start)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(0x08000000); // 默认STM32 Flash地址
+            // BIN文件需要指定基地址
+            let base_address = if options.use_custom_address.unwrap_or(false) {
+                // 使用自定义地址
+                options.custom_flash_address.unwrap_or(0x08000000)
+            } else {
+                // 自动从目标内存映射获取Flash起始地址
+                session.target().memory_map.iter()
+                    .find_map(|region| {
+                        if let probe_rs::config::MemoryRegion::Nvm(r) = region {
+                            Some(r.range.start)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0x08000000) // 默认STM32 Flash地址
+            };
             Format::Bin(BinOptions { base_address: Some(base_address), skip: 0 })
         }
         _ => Format::Elf, // 默认尝试ELF格式

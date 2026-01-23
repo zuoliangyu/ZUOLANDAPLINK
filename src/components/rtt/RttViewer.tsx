@@ -93,7 +93,7 @@ function parseAnsiText(text: string): TextSegment[] {
 }
 
 export function RttViewer() {
-  const { lines, selectedChannel, searchQuery, autoScroll, showTimestamp, isRunning } =
+  const { lines, selectedChannel, searchQuery, autoScroll, showTimestamp, isRunning, displayMode } =
     useRttStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -140,7 +140,7 @@ export function RttViewer() {
       className="h-full overflow-y-auto font-mono text-xs leading-5 p-2 bg-background"
     >
       {filteredLines.map((line) => (
-        <RttLineItem key={line.id} line={line} showTimestamp={showTimestamp} />
+        <RttLineItem key={line.id} line={line} showTimestamp={showTimestamp} displayMode={displayMode} />
       ))}
       <div ref={bottomRef} />
     </div>
@@ -150,9 +150,10 @@ export function RttViewer() {
 interface RttLineItemProps {
   line: RttLine;
   showTimestamp: boolean;
+  displayMode: "text" | "hex";
 }
 
-function RttLineItem({ line, showTimestamp }: RttLineItemProps) {
+function RttLineItem({ line, showTimestamp, displayMode }: RttLineItemProps) {
   const levelColors: Record<RttLine["level"], string> = {
     error: "text-red-500",
     warn: "text-yellow-500",
@@ -168,6 +169,20 @@ function RttLineItem({ line, showTimestamp }: RttLineItemProps) {
     return `${hours}:${minutes}:${seconds}.${ms}`;
   };
 
+  // 格式化为十六进制
+  const formatHex = (data: number[]) => {
+    if (!data || data.length === 0) {
+      // 如果没有原始数据，从文本重新编码
+      const bytes = new TextEncoder().encode(line.text);
+      return Array.from(bytes)
+        .map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
+        .join(" ");
+    }
+    return data
+      .map((byte) => byte.toString(16).padStart(2, "0").toUpperCase())
+      .join(" ");
+  };
+
   // 解析 ANSI 颜色
   const segments = parseAnsiText(line.text);
 
@@ -179,13 +194,19 @@ function RttLineItem({ line, showTimestamp }: RttLineItemProps) {
         </span>
       )}
       <span className="text-muted-foreground shrink-0 select-none">[{line.channel}]</span>
-      <span className="whitespace-pre-wrap break-all">
-        {segments.map((segment, index) => (
-          <span key={index} className={segment.className}>
-            {segment.text}
-          </span>
-        ))}
-      </span>
+      {displayMode === "hex" ? (
+        <span className="whitespace-pre-wrap break-all font-mono">
+          {formatHex(line.rawData || [])}
+        </span>
+      ) : (
+        <span className="whitespace-pre-wrap break-all">
+          {segments.map((segment, index) => (
+            <span key={index} className={segment.className}>
+              {segment.text}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

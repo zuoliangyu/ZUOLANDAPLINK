@@ -222,7 +222,7 @@ export function Header() {
   return (
     <header className="flex items-center h-12 px-2 border-b border-border bg-background no-select">
       <div className="flex items-center gap-1">
-        <span className="text-lg font-bold text-primary px-2">ZUOLAN DAPLINK</span>
+        <span className="text-lg font-bold text-primary px-2">ZUOLAN DAPLINK RTTVIEW</span>
         <ToolbarSeparator />
 
         {/* 文件操作 */}

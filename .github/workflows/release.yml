@@ -142,7 +142,7 @@ jobs:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
           releaseName: 'ZUOLAN DAPLINK ${{ github.event.inputs.version || github.ref_name }}'
           releaseBody: |
-            ## ZUOLAN DAPLINK 烧录工具
+            ## ZUOLAN DAPLINK RTTVIEW
 
             ### 下载说明
 

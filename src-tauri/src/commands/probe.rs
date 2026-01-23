@@ -14,6 +14,7 @@ pub struct ProbeInfo {
     pub product_id: u16,
     pub serial_number: Option<String>,
     pub probe_type: String,
+    pub dap_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,12 +67,28 @@ pub async fn list_probes() -> AppResult<Vec<ProbeInfo>> {
 
     let probe_infos: Vec<ProbeInfo> = probes
         .into_iter()
-        .map(|p| ProbeInfo {
-            identifier: p.identifier.clone(),
-            vendor_id: p.vendor_id,
-            product_id: p.product_id,
-            serial_number: p.serial_number.clone(),
-            probe_type: format!("{:?}", p.probe_type()),
+        .map(|p| {
+            let probe_type_str = format!("{:?}", p.probe_type());
+
+            // 判断DAP版本：CmsisDap表示DAPv1(HID)，CmsisDapV2表示DAPv2(WinUSB)
+            let dap_version = if probe_type_str.contains("CmsisDap") {
+                if probe_type_str.contains("V2") {
+                    Some("DAPv2 (WinUSB)".to_string())
+                } else {
+                    Some("DAPv1 (HID)".to_string())
+                }
+            } else {
+                None
+            };
+
+            ProbeInfo {
+                identifier: p.identifier.clone(),
+                vendor_id: p.vendor_id,
+                product_id: p.product_id,
+                serial_number: p.serial_number.clone(),
+                probe_type: probe_type_str,
+                dap_version,
+            }
         })
         .collect();
 
@@ -126,6 +143,12 @@ pub async fn connect_target(
             .map_err(|e| AppError::ProbeError(e.to_string()))?;
     }
 
+    // 尝试在连接前读取目标IDCODE
+    // 注意：probe-rs 0.27版本的API不直接暴露DP IDCODE读取
+    // IDCODE在连接时由probe-rs内部读取，但无法通过公开API获取
+    // 这是probe-rs的已知限制，未来版本可能会改进
+    let target_idcode: Option<u32> = None;
+
     // 连接目标
     let mut session = if options.connect_mode == ConnectMode::UnderReset {
         probe
@@ -137,7 +160,7 @@ pub async fn connect_target(
             .map_err(|e| AppError::ProbeError(e.to_string()))?
     };
 
-    // 读取芯片ID
+    // 读取芯片ID（DBGMCU_IDCODE）
     let chip_id = read_chip_id(&mut session);
 
     // 获取目标信息
@@ -181,9 +204,11 @@ pub async fn connect_target(
         let mut conn_info = state.connection_info.lock();
         *conn_info = Some(ConnectionInfo {
             probe_name: options.probe_identifier.clone(),
+            probe_serial: probe_info.serial_number.clone(),  // 保存探针序列号
             target_name: options.target.clone(),
             core_type: target_info.core_type.clone(),
             chip_id,
+            target_idcode,  // 保存目标IDCODE
         });
     }
 
