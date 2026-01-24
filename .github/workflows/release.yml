@@ -186,6 +186,7 @@ jobs:
             | 平台 | 文件 | 说明 |
             |------|------|------|
             | **Windows** | `*_x64-setup.exe` | NSIS 安装程序 |
+            | **Windows** | `*_x64_portable.exe` | 便携版（免安装） |
             | **macOS (Apple Silicon)** | `*_aarch64.dmg` | M1/M2/M3芯片Mac |
             | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
             | **Linux** | `*_amd64.AppImage` | 通用Linux |
@@ -201,6 +202,26 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: --target ${{ matrix.target }} ${{ matrix.os_name == 'windows' && '--bundles nsis' || '' }}
+
+      # Windows 便携版：上传单独的 exe 文件
+      - name: Upload Windows portable exe
+        if: matrix.os_name == 'windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          EXE_PATH="src-tauri/target/x86_64-pc-windows-msvc/release/zuolandaplink.exe"
+
+          if [ -f "$EXE_PATH" ]; then
+            PORTABLE_NAME="ZUOLAN.DAPLINK_${VERSION}_x64_portable.exe"
+            cp "$EXE_PATH" "$PORTABLE_NAME"
+            gh release upload "$TAG" "$PORTABLE_NAME" --clobber
+            echo "Uploaded Windows portable: $PORTABLE_NAME"
+          else
+            echo "Warning: Portable exe not found at $EXE_PATH"
+          fi
 
       # 保存平台键名到 artifact（用于后续合并）
       - name: Save platform info

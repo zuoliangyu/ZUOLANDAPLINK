@@ -5,6 +5,13 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.5] - 2026-01-24
+
+### 新增
+- 📦 **Windows 便携版** - 新增免安装的单文件便携版
+  - `*_x64_portable.exe` 可直接运行，无需安装
+  - 适合 U 盘携带或临时使用
+
 ## [0.5.4] - 2026-01-24
 
 ### 修复
