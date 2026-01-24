@@ -2,7 +2,7 @@
 
 一个开源的第三方DAPLINK烧录软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.4.0--beta.1-blue)
+![Version](https://img.shields.io/badge/version-0.4.0--beta.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性

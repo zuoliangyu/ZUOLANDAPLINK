@@ -5,6 +5,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0-beta.2] - 2026-01-24
+
+### 新增功能
+- ✨ **Windows 便携版** - 支持生成绿色版可执行文件，无需安装直接运行
+
+### 改进
+- 🎨 **NSIS 便携模式** - 配置 Tauri 生成便携版 Windows 应用
+- 🎨 **发布说明优化** - 更新 GitHub Actions 发布说明，添加便携版下载说明
+
+### 技术细节
+- 在 tauri.conf.json 中添加 `nsis.portable: true` 配置
+- 便携版将所有配置和数据保存在程序目录
+- 适合U盘携带或多台电脑使用
+
 ## [0.4.0-beta.1] - 2026-01-24
 
 ### 新增功能
