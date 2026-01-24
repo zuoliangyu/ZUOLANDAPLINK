@@ -483,26 +483,52 @@ pub fn match_flm_for_device(
     let flash_size_kb = flash_size / 1024;
     let flash_size_mb = flash_size / (1024 * 1024);
 
-    // 1. 精确匹配设备型号
+    log::info!("匹配 FLM: 设备={}, Flash={}KB, 可用FLM数={}", device_name, flash_size_kb, flm_files.len());
+
+    // 1. 精确匹配设备型号（Flash + 设备名）
     for flm_path in flm_files {
         if let Some(file_name) = flm_path.file_name().and_then(|s| s.to_str()) {
             let stem = file_name.to_uppercase().trim_end_matches(".FLM").to_string();
-            if stem == device_upper {
+            // 移除常见前缀 "FLASH" 进行比较
+            let stem_clean = stem.trim_start_matches("FLASH");
+            if stem == device_upper || stem_clean == device_upper {
                 log::info!("精确匹配 FLM: {} -> {}", device_name, file_name);
                 return Some(flm_path.clone());
             }
         }
     }
 
-    // 2. 按 Flash 大小匹配
+    // 2. 提取设备系列（如 CW32L010F8 -> CW32L010）
+    // 去除末尾的封装后缀（如 F8, C8, R8 等）
+    let device_series = extract_device_series(&device_upper);
+    log::info!("设备系列: {}", device_series);
+
+    // 3. 尝试匹配 Flash+设备系列
+    for flm_path in flm_files {
+        if let Some(file_name) = flm_path.file_name().and_then(|s| s.to_str()) {
+            let file_name_upper = file_name.to_uppercase();
+            let stem = file_name_upper.trim_end_matches(".FLM");
+            let stem_clean = stem.trim_start_matches("FLASH");
+
+            if stem_clean == device_series {
+                log::info!("系列匹配 FLM: {} ({}) -> {}", device_name, device_series, file_name);
+                return Some(flm_path.clone());
+            }
+        }
+    }
+
+    // 4. 按 Flash 大小匹配
     let size_patterns: Vec<String> = if flash_size_mb >= 1 {
         vec![format!("_{}MB", flash_size_mb), format!("{}MB", flash_size_mb)]
     } else {
-        vec![format!("_{}KB", flash_size_kb), format!("{}KB", flash_size_kb)]
+        vec![format!("_{}KB", flash_size_kb), format!("{}KB", flash_size_kb), format!("_{}K", flash_size_kb)]
     };
 
+    // 提取短前缀用于系列匹配
     let series_prefix = if device_upper.starts_with("GD32") || device_upper.starts_with("STM32") {
         device_upper.chars().take(6).collect::<String>()
+    } else if device_upper.starts_with("CW32") {
+        device_upper.chars().take(7).collect::<String>() // CW32L01, CW32F03 等
     } else {
         device_upper.chars().take(4).collect::<String>()
     };
@@ -521,28 +547,15 @@ pub fn match_flm_for_device(
         }
     }
 
-    // 3. 按设备系列匹配
-    let device_series = if device_upper.len() >= 9 {
-        device_upper.chars().take(8).collect::<String>()
-    } else {
-        device_upper.clone()
-    };
-
-    for flm_path in flm_files {
-        if let Some(file_name) = flm_path.file_name().and_then(|s| s.to_str()) {
-            let stem = file_name.to_uppercase().trim_end_matches(".FLM").to_string();
-            if stem == device_series {
-                log::info!("按系列匹配 FLM: {} -> {}", device_name, file_name);
-                return Some(flm_path.clone());
-            }
-        }
-    }
-
-    // 4. 模糊匹配（无大小后缀）
+    // 5. 模糊匹配（设备系列包含在 FLM 名称中，或 FLM 名称包含在设备系列中）
     for flm_path in flm_files {
         if let Some(file_name) = flm_path.file_name().and_then(|s| s.to_str()) {
             let file_name_upper = file_name.to_uppercase();
-            if file_name_upper.contains(&series_prefix) {
+            let stem = file_name_upper.trim_end_matches(".FLM");
+            let stem_clean = stem.trim_start_matches("FLASH");
+
+            // 检查是否有交集
+            if device_series.contains(stem_clean) || stem_clean.contains(&device_series) {
                 let has_size_suffix = file_name_upper.contains("KB") || file_name_upper.contains("MB");
                 if !has_size_suffix {
                     log::info!("模糊匹配 FLM: {} -> {}", device_name, file_name);
@@ -552,6 +565,50 @@ pub fn match_flm_for_device(
         }
     }
 
+    // 6. 最后尝试：匹配任何包含系列前缀且无大小后缀的 FLM
+    for flm_path in flm_files {
+        if let Some(file_name) = flm_path.file_name().and_then(|s| s.to_str()) {
+            let file_name_upper = file_name.to_uppercase();
+            if file_name_upper.contains(&series_prefix) {
+                let has_size_suffix = file_name_upper.contains("KB") || file_name_upper.contains("MB");
+                if !has_size_suffix {
+                    log::info!("前缀匹配 FLM: {} -> {}", device_name, file_name);
+                    return Some(flm_path.clone());
+                }
+            }
+        }
+    }
+
     log::warn!("未找到设备 {} (Flash: {}KB) 的匹配 FLM", device_name, flash_size_kb);
     None
+}
+
+/// 从设备名称提取系列名（去除封装后缀）
+/// 例如: CW32L010F8 -> CW32L010, STM32F103C8Tx -> STM32F103
+fn extract_device_series(device_name: &str) -> String {
+    let name = device_name.to_uppercase();
+
+    // CW32 系列: CW32L010F8 -> CW32L010
+    if name.starts_with("CW32") {
+        // 查找第一个数字序列后的字母
+        let mut last_digit_pos = 0;
+        for (i, c) in name.char_indices() {
+            if c.is_ascii_digit() {
+                last_digit_pos = i;
+            }
+        }
+        // 返回到最后一个数字位置
+        if last_digit_pos > 0 {
+            return name[..=last_digit_pos].to_string();
+        }
+    }
+
+    // GD32/STM32 系列: STM32F103C8Tx -> STM32F103
+    if name.starts_with("GD32") || name.starts_with("STM32") {
+        // 简化：取前 9 个字符作为系列名
+        return name.chars().take(9.min(name.len())).collect();
+    }
+
+    // 默认：取前 8 个字符
+    name.chars().take(8.min(name.len())).collect()
 }

@@ -57,6 +57,8 @@ fn find_pdsc_file(pack_dir: &Path) -> AppResult<std::path::PathBuf> {
 }
 
 /// 从 PDSC 内容解析设备定义
+/// 支持 CMSIS Pack 的层级结构：devices -> family -> subFamily -> device
+/// processor、memory、algorithm 可以在任意层级定义，子级继承父级的配置
 pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>> {
     let mut reader = Reader::from_str(content);
     reader.config_mut().trim_text(true);
@@ -65,17 +67,51 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
     let mut buf = Vec::new();
 
     let mut in_devices = false;
+
+    // 层级继承：family -> subFamily -> device
+    // 每个层级可以定义 processor、memory、algorithm，子级继承父级
+    let mut family_processor: Option<ProcessorInfo> = None;
+    let mut family_memory: Option<MemoryInfo> = None;
+    let mut family_algorithm: Option<String> = None;
+
+    let mut subfamily_processor: Option<ProcessorInfo> = None;
+    let mut subfamily_memory: Option<MemoryInfo> = None;
+    let mut subfamily_algorithm: Option<String> = None;
+
     let mut current_device: Option<DeviceDefinition> = None;
     let mut current_processor: Option<ProcessorInfo> = None;
+
+    // 跟踪当前层级
+    let mut in_family = false;
+    let mut in_subfamily = false;
+    let mut in_device = false;
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
+                let is_empty = matches!(reader.read_event_into(&mut Vec::new()), Ok(Event::Empty(_)));
+                let _ = is_empty; // 避免警告
+
                 match e.name().as_ref() {
                     b"devices" => {
                         in_devices = true;
                     }
+                    b"family" if in_devices => {
+                        in_family = true;
+                        // 清除 family 级别的继承数据
+                        family_processor = None;
+                        family_memory = None;
+                        family_algorithm = None;
+                    }
+                    b"subFamily" if in_family => {
+                        in_subfamily = true;
+                        // 清除 subFamily 级别的继承数据，但保留 family 的
+                        subfamily_processor = None;
+                        subfamily_memory = None;
+                        subfamily_algorithm = None;
+                    }
                     b"device" if in_devices => {
+                        in_device = true;
                         // 开始新设备
                         let mut name = String::new();
 
@@ -88,24 +124,36 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                         }
 
                         if !name.is_empty() {
-                            current_device = Some(DeviceDefinition {
-                                name,
-                                processor: ProcessorInfo {
+                            // 从父级继承配置
+                            let inherited_processor = subfamily_processor.clone()
+                                .or_else(|| family_processor.clone())
+                                .unwrap_or(ProcessorInfo {
                                     core: String::new(),
                                     fpu: false,
                                     mpu: false,
-                                },
-                                memory: MemoryInfo {
+                                });
+
+                            let inherited_memory = subfamily_memory.clone()
+                                .or_else(|| family_memory.clone())
+                                .unwrap_or(MemoryInfo {
                                     ram_start: 0,
                                     ram_size: 0,
                                     flash_start: 0,
                                     flash_size: 0,
-                                },
-                                flash_algorithm: None,
+                                });
+
+                            let inherited_algorithm = subfamily_algorithm.clone()
+                                .or_else(|| family_algorithm.clone());
+
+                            current_device = Some(DeviceDefinition {
+                                name,
+                                processor: inherited_processor,
+                                memory: inherited_memory,
+                                flash_algorithm: inherited_algorithm,
                             });
                         }
                     }
-                    b"processor" if current_device.is_some() => {
+                    b"processor" if in_devices => {
                         let mut core = String::new();
                         let mut fpu = false;
                         let mut mpu = false;
@@ -118,7 +166,7 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                                     }
                                     b"Dfpu" => {
                                         let val = String::from_utf8_lossy(&attr.value);
-                                        fpu = val == "1" || val.to_lowercase() == "true";
+                                        fpu = val == "1" || val.to_lowercase() == "true" || val.to_lowercase() == "sp_fpu";
                                     }
                                     b"Dmpu" => {
                                         let val = String::from_utf8_lossy(&attr.value);
@@ -129,10 +177,20 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                             }
                         }
 
-                        current_processor = Some(ProcessorInfo { core, fpu, mpu });
+                        let proc_info = ProcessorInfo { core, fpu, mpu };
+
+                        // 根据当前层级保存 processor 信息
+                        if in_device {
+                            current_processor = Some(proc_info);
+                        } else if in_subfamily {
+                            subfamily_processor = Some(proc_info);
+                        } else if in_family {
+                            family_processor = Some(proc_info);
+                        }
                     }
-                    b"memory" if current_device.is_some() => {
+                    b"memory" if in_devices => {
                         let mut id = String::new();
+                        let mut name_attr = String::new();
                         let mut start = 0u64;
                         let mut size = 0u64;
                         let mut is_default = false;
@@ -142,6 +200,9 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                                 match attr.key.as_ref() {
                                     b"id" => {
                                         id = String::from_utf8_lossy(&attr.value).to_string();
+                                    }
+                                    b"name" => {
+                                        name_attr = String::from_utf8_lossy(&attr.value).to_string();
                                     }
                                     b"start" => {
                                         let val = String::from_utf8_lossy(&attr.value);
@@ -160,36 +221,68 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                             }
                         }
 
-                        // 更新当前设备的内存信息
-                        if let Some(ref mut dev) = current_device {
-                            if id.to_uppercase().contains("IROM") || id.to_uppercase().contains("FLASH") {
+                        // 使用 id 或 name 来判断内存类型
+                        let mem_id = if !id.is_empty() { id } else { name_attr };
+                        let mem_id_upper = mem_id.to_uppercase();
+
+                        // 确定目标 MemoryInfo
+                        let target_memory = if in_device {
+                            current_device.as_mut().map(|d| &mut d.memory)
+                        } else if in_subfamily {
+                            if subfamily_memory.is_none() {
+                                subfamily_memory = Some(MemoryInfo {
+                                    ram_start: 0, ram_size: 0, flash_start: 0, flash_size: 0
+                                });
+                            }
+                            subfamily_memory.as_mut()
+                        } else if in_family {
+                            if family_memory.is_none() {
+                                family_memory = Some(MemoryInfo {
+                                    ram_start: 0, ram_size: 0, flash_start: 0, flash_size: 0
+                                });
+                            }
+                            family_memory.as_mut()
+                        } else {
+                            None
+                        };
+
+                        if let Some(mem) = target_memory {
+                            if mem_id_upper.contains("IROM") || mem_id_upper.contains("FLASH") || mem_id_upper.contains("ROM") {
                                 // Flash: 优先使用 default 或更大的区域
-                                if dev.memory.flash_size == 0 || is_default || size > dev.memory.flash_size {
-                                    dev.memory.flash_start = start;
-                                    dev.memory.flash_size = size;
+                                if mem.flash_size == 0 || is_default || size > mem.flash_size {
+                                    mem.flash_start = start;
+                                    mem.flash_size = size;
                                 }
-                            } else if id.to_uppercase().contains("IRAM") || id.to_uppercase().contains("RAM") {
+                            } else if mem_id_upper.contains("IRAM") || mem_id_upper.contains("RAM") || mem_id_upper.contains("SRAM") {
                                 // RAM: 优先使用 default="1" 的区域，或者主 SRAM (0x20000000)
-                                // GD32/STM32 的主 SRAM 通常在 0x20000000，TCM RAM 在 0x10000000
-                                let should_update = dev.memory.ram_size == 0  // 还没有 RAM 信息
-                                    || is_default  // 当前是 default RAM
-                                    || (start >= 0x20000000 && dev.memory.ram_start < 0x20000000);  // 主 SRAM 优先
+                                let should_update = mem.ram_size == 0
+                                    || is_default
+                                    || (start >= 0x20000000 && mem.ram_start < 0x20000000);
 
                                 if should_update {
-                                    dev.memory.ram_start = start;
-                                    dev.memory.ram_size = size;
+                                    mem.ram_start = start;
+                                    mem.ram_size = size;
                                 }
                             }
                         }
                     }
-                    b"algorithm" if current_device.is_some() => {
+                    b"algorithm" if in_devices => {
                         for attr in e.attributes() {
                             if let Ok(attr) = attr {
                                 if attr.key.as_ref() == b"name" {
                                     let algo_name = String::from_utf8_lossy(&attr.value).to_string();
-                                    if let Some(ref mut dev) = current_device {
-                                        dev.flash_algorithm = Some(algo_name);
+
+                                    // 根据当前层级保存 algorithm
+                                    if in_device {
+                                        if let Some(ref mut dev) = current_device {
+                                            dev.flash_algorithm = Some(algo_name);
+                                        }
+                                    } else if in_subfamily {
+                                        subfamily_algorithm = Some(algo_name);
+                                    } else if in_family {
+                                        family_algorithm = Some(algo_name);
                                     }
+                                    break;
                                 }
                             }
                         }
@@ -202,12 +295,32 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
                     b"devices" => {
                         in_devices = false;
                     }
+                    b"family" => {
+                        in_family = false;
+                        family_processor = None;
+                        family_memory = None;
+                        family_algorithm = None;
+                    }
+                    b"subFamily" => {
+                        in_subfamily = false;
+                        subfamily_processor = None;
+                        subfamily_memory = None;
+                        subfamily_algorithm = None;
+                    }
                     b"device" => {
+                        in_device = false;
                         // 完成当前设备
                         if let Some(mut dev) = current_device.take() {
+                            // 如果设备级别有 processor，使用设备级别的
                             if let Some(proc) = current_processor.take() {
                                 dev.processor = proc;
                             }
+
+                            // 记录设备信息
+                            log::info!("解析设备: {} - Flash: 0x{:X}+0x{:X}, RAM: 0x{:X}+0x{:X}, Algorithm: {:?}",
+                                dev.name, dev.memory.flash_start, dev.memory.flash_size,
+                                dev.memory.ram_start, dev.memory.ram_size, dev.flash_algorithm);
+
                             devices.push(dev);
                         }
                         current_processor = None;
@@ -224,6 +337,7 @@ pub fn parse_devices_from_pdsc(content: &str) -> AppResult<Vec<DeviceDefinition>
         buf.clear();
     }
 
+    log::info!("从 PDSC 解析出 {} 个设备", devices.len());
     Ok(devices)
 }
 
