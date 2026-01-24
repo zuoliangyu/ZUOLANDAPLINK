@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProbeStore } from "@/stores/probeStore";
+import { useChipStore } from "@/stores/chipStore";
 import { useFlashStore } from "@/stores/flashStore";
 import { useLogStore } from "@/stores/logStore";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -66,6 +67,7 @@ function ToolbarSeparator() {
 
 export function Header() {
   const { connected } = useProbeStore();
+  const { selectedFlashAlgorithm } = useChipStore();
   const {
     firmwarePath,
     setFirmwarePath,
@@ -139,6 +141,7 @@ export function Header() {
         skip_erase: false,
         reset_after: resetAfterFlash,
         erase_mode: eraseMode,
+        flash_algorithm: selectedFlashAlgorithm || undefined,
       });
 
       addLog("success", "烧录成功");

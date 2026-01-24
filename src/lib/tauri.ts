@@ -114,6 +114,10 @@ export async function getChipInfo(chipName: string): Promise<ChipInfo> {
   return await invoke<ChipInfo>("get_chip_info", { chipName });
 }
 
+export async function initPacks(): Promise<number> {
+  return await invoke<number>("init_packs");
+}
+
 export async function importPack(packPath: string): Promise<PackInfo> {
   return await invoke<PackInfo>("import_pack", { packPath });
 }

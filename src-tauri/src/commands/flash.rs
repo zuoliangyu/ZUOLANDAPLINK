@@ -62,6 +62,8 @@ pub struct FlashOptions {
     pub use_custom_address: Option<bool>,
     pub custom_flash_address: Option<u64>,
     pub custom_flash_size: Option<u64>,
+    // Flash算法选择
+    pub flash_algorithm: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -85,6 +87,13 @@ pub async fn flash_firmware(
     let path = Path::new(&options.file_path);
     if !path.exists() {
         return Err(AppError::FileError("文件不存在".to_string()));
+    }
+
+    // 记录选中的Flash算法（如果指定）
+    if let Some(ref algo_name) = options.flash_algorithm {
+        log::info!("用户选择的Flash算法: {}", algo_name);
+        // 注意：probe-rs 0.27 会自动使用目标配置中的算法
+        // 这里只是记录用户的选择，实际算法由probe-rs根据地址范围自动选择
     }
 
     // 根据文件扩展名确定格式

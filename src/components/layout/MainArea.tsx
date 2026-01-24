@@ -11,7 +11,7 @@ import { Cpu, HardDrive, Layers, Settings, Terminal } from "lucide-react";
 
 export function MainArea() {
   const { connected, targetInfo } = useProbeStore();
-  const { chipInfo } = useChipStore();
+  const { chipInfo, selectedFlashAlgorithm, selectFlashAlgorithm } = useChipStore();
   const {
     flashing,
     progress,
@@ -162,12 +162,22 @@ export function MainArea() {
                       {chipInfo.flash_algorithms.map((algo, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between text-sm py-1 border-b border-border last:border-0"
+                          onClick={() => selectFlashAlgorithm(algo.name)}
+                          className={`flex items-center justify-between text-sm py-2 px-2 rounded cursor-pointer transition-colors ${
+                            selectedFlashAlgorithm === algo.name
+                              ? "bg-primary/10 border border-primary"
+                              : "hover:bg-accent border border-transparent"
+                          }`}
                         >
                           <span className="font-mono text-xs">{algo.name}</span>
-                          {algo.default && (
-                            <span className="text-xs text-green-500">默认</span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {algo.default && (
+                              <span className="text-xs text-green-500">默认</span>
+                            )}
+                            {selectedFlashAlgorithm === algo.name && (
+                              <span className="text-xs text-primary font-medium">✓</span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

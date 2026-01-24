@@ -49,6 +49,7 @@ pub fn run() {
             config::get_supported_chips,
             config::search_chips,
             config::get_chip_info,
+            config::init_packs,
             config::import_pack,
             config::list_imported_packs,
             config::delete_pack,

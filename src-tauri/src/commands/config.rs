@@ -1,6 +1,7 @@
 use crate::error::{AppError, AppResult};
 use crate::pack::manager::{PackManager, PackInfo};
-use probe_rs::config::get_target_by_name;
+use crate::pack::target_gen;
+use probe_rs::config::{add_target_from_yaml, get_target_by_name};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -118,8 +119,7 @@ const BUILTIN_CHIPS: &[&str] = &[
     "GD32F405RGT6", "GD32F405VGT6", "GD32F405ZGT6",
     "GD32F407RET6", "GD32F407RGT6", "GD32F407VET6", "GD32F407VGT6",
     "GD32F407ZET6", "GD32F407ZGT6", "GD32F450VGT6", "GD32F450ZGT6",
-    "GD32F470VGT6", "GD32F470VIT6", "GD32F470ZGT6", "GD32F470ZIT6",
-    "GD32F470IGT6", "GD32F470IIT6",
+    // 注意：GD32F470 系列需要通过 CMSIS-Pack 导入才能使用
     // GD32E
     "GD32E103C8T6", "GD32E103CBT6", "GD32E103RBT6", "GD32E103RCT6",
     "GD32E230C8T6", "GD32E230F8P6", "GD32E230G8U6",
@@ -156,11 +156,109 @@ pub async fn search_chips(query: String) -> AppResult<Vec<String>> {
     Ok(matched)
 }
 
+/// 初始化：加载所有已导入的 Pack 到 probe-rs
+/// 应该在应用启动时调用
+#[tauri::command]
+pub async fn init_packs() -> AppResult<usize> {
+    let manager = PackManager::new()?;
+    let packs = manager.list_packs()?;
+
+    let pack_count = packs.len();
+    let mut total_devices = 0;
+
+    for pack in packs {
+        let pack_dir = manager.get_pack_dir(&pack.name);
+
+        match register_pack_devices(&pack_dir, &pack.name) {
+            Ok(count) => {
+                total_devices += count;
+                log::info!("从 Pack {} 加载了 {} 个设备", pack.name, count);
+            }
+            Err(e) => {
+                log::warn!("从 Pack {} 加载设备失败: {}", pack.name, e);
+            }
+        }
+    }
+
+    log::info!("总共加载了 {} 个设备从 {} 个 Pack", total_devices, pack_count);
+
+    Ok(total_devices)
+}
+
+/// 获取芯片的回退兼容型号
+/// 当 probe-rs 不支持某个芯片时，尝试使用相似架构的芯片
+fn get_fallback_chip(chip_name: &str) -> Option<String> {
+    let chip_upper = chip_name.to_uppercase();
+
+    // GD32F470 系列 -> GD32F407 (相似的 Cortex-M4 架构)
+    if chip_upper.starts_with("GD32F470") {
+        return Some("GD32F407".to_string());
+    }
+
+    // GD32F450 系列 -> GD32F407
+    if chip_upper.starts_with("GD32F450") {
+        return Some("GD32F407".to_string());
+    }
+
+    // 可以添加更多回退规则
+    // 例如：GD32F3xx -> STM32F3xx
+
+    None
+}
+
+/// 从 Pack 目录注册设备到 probe-rs
+fn register_pack_devices(pack_dir: &PathBuf, pack_name: &str) -> AppResult<usize> {
+    // 解析 Pack 中的设备定义
+    let devices = target_gen::parse_devices_from_pack(pack_dir)?;
+
+    if devices.is_empty() {
+        return Err(AppError::PackError("Pack 中未找到设备定义".to_string()));
+    }
+
+    log::info!("从 Pack {} 解析到 {} 个设备", pack_name, devices.len());
+
+    // 生成 probe-rs YAML 格式（包含 Flash 算法）
+    let yaml_content = target_gen::generate_probe_rs_yaml_with_algo(&devices, pack_name, pack_dir)?;
+
+    // 保存 YAML 文件到 Pack 目录
+    let yaml_path = pack_dir.join("targets.yaml");
+    std::fs::write(&yaml_path, &yaml_content)?;
+
+    log::info!("生成 YAML 文件: {:?}", yaml_path);
+
+    // 注册到 probe-rs（需要将字符串转换为字节流）
+    match add_target_from_yaml(yaml_content.as_bytes()) {
+        Ok(_) => {
+            log::info!("成功注册 {} 个设备到 probe-rs（包含 Flash 算法）", devices.len());
+            Ok(devices.len())
+        }
+        Err(e) => {
+            Err(AppError::PackError(format!("注册设备到 probe-rs 失败: {}", e)))
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn get_chip_info(chip_name: String) -> AppResult<ChipInfo> {
     // 尝试从probe-rs获取目标信息
-    let target = get_target_by_name(&chip_name)
-        .map_err(|e| AppError::ConfigError(format!("未找到芯片 {}: {}", chip_name, e)))?;
+    let target = match get_target_by_name(&chip_name) {
+        Ok(t) => t,
+        Err(e) => {
+            // 如果找不到精确匹配，尝试使用家族名称作为回退
+            // 例如：GD32F470ZGT6 -> GD32F407 (相似架构)
+            let fallback_chip = get_fallback_chip(&chip_name);
+            if let Some(fallback) = fallback_chip {
+                log::warn!("芯片 {} 不在 probe-rs 数据库中，尝试使用兼容芯片: {}", chip_name, fallback);
+                get_target_by_name(&fallback)
+                    .map_err(|e2| AppError::ConfigError(format!(
+                        "未找到芯片 {} 及其兼容芯片 {}: 原始错误: {}, 回退错误: {}",
+                        chip_name, fallback, e, e2
+                    )))?
+            } else {
+                return Err(AppError::ConfigError(format!("未找到芯片 {}: {}", chip_name, e)));
+            }
+        }
+    };
 
     let chip_info = ChipInfo {
         name: target.name.clone(),
@@ -229,6 +327,18 @@ pub async fn import_pack(pack_path: String) -> AppResult<PackInfo> {
 
     let manager = PackManager::new()?;
     let pack_info = manager.import_pack(&path)?;
+
+    // 导入后，尝试从 Pack 中提取设备定义并注册到 probe-rs
+    let pack_dir = manager.get_pack_dir(&pack_info.name);
+
+    match register_pack_devices(&pack_dir, &pack_info.name) {
+        Ok(count) => {
+            log::info!("成功从 Pack {} 注册了 {} 个设备到 probe-rs", pack_info.name, count);
+        }
+        Err(e) => {
+            log::warn!("从 Pack {} 注册设备失败: {}，Pack 已导入但设备可能无法使用", pack_info.name, e);
+        }
+    }
 
     Ok(pack_info)
 }

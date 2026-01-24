@@ -90,6 +90,7 @@ export interface FlashOptions {
   skip_erase: boolean;
   reset_after: boolean;
   erase_mode: EraseMode;
+  flash_algorithm?: string; // 可选：指定使用的Flash算法名称
 }
 
 // Flash进度事件

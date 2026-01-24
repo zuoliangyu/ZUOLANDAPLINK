@@ -7,7 +7,7 @@ import { useLogStore } from "./stores/logStore";
 import { useProbeStore } from "./stores/probeStore";
 import { useRttStore } from "./stores/rttStore";
 import { useUserActivity } from "./hooks/useUserActivity";
-import { disconnect } from "./lib/tauri";
+import { disconnect, initPacks } from "./lib/tauri";
 
 function App() {
   const addLog = useLogStore((state) => state.addLog);
@@ -18,6 +18,17 @@ function App() {
   useEffect(() => {
     addLog("info", "ZUOLAN DAPLINK RTTVIEW工具已启动");
     addLog("info", "等待连接调试探针...");
+
+    // 初始化：加载已导入的 Pack
+    initPacks()
+      .then((count) => {
+        if (count > 0) {
+          addLog("success", `已加载 ${count} 个芯片定义从 CMSIS-Pack`);
+        }
+      })
+      .catch((error) => {
+        addLog("warn", `加载 Pack 失败: ${error}`);
+      });
   }, [addLog]);
 
   // 自动断开逻辑

@@ -1,2 +1,4 @@
 pub mod manager;
 pub mod parser;
+pub mod target_gen;
+pub mod flash_algo;
