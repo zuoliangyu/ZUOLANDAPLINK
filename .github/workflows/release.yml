@@ -170,8 +170,7 @@ jobs:
 
             | 平台 | 文件 | 说明 |
             |------|------|------|
-            | **Windows** | `*_x64-setup.exe` | NSIS 安装程序 (推荐) |
-            | **Windows** | `*_x64_en-US.msi` | MSI 安装包 |
+            | **Windows** | `*_x64-setup.exe` | NSIS 安装程序 |
             | **macOS (Apple Silicon)** | `*_aarch64.dmg` | M1/M2/M3芯片Mac |
             | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
             | **Linux** | `*_amd64.AppImage` | 通用Linux |
@@ -185,4 +184,4 @@ jobs:
             完整更新历史: [CHANGELOG.md](https://github.com/zuoliangyu/ZUOLANDAPLINK/blob/main/CHANGELOG.md)
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.os_name == 'windows' && '--bundles nsis' || '' }}
