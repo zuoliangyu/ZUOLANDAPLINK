@@ -5,6 +5,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.6] - 2026-01-24
+
+### 改进
+- 🔧 **代码质量优化** - 全面提升代码质量和类型安全
+  - 创建 `TooltipButton` 和 `TooltipWrapper` 共享组件，消除 30+ 处重复代码
+  - 修复所有 `any` 类型使用（10 处 → 0 处）
+  - 清理所有开发调试的 console 语句（11 处 → 0 处）
+  - 新增 `PackScanReport`、`AlgorithmStat` 等类型定义
+
+### 重构
+- 📦 **FlashMode 组件拆分** - 提升代码可维护性
+  - 将 742 行的大组件拆分为 4 个独立文件
+  - `FlashToolbar.tsx` - 工具栏组件（353 行）
+  - `FlashContent.tsx` - 内容区域组件（311 行）
+  - `FlashMode.tsx` - 主组件（97 行）
+
 ## [0.5.5] - 2026-01-24
 
 ### 新增

@@ -1,0 +1,78 @@
+import * as React from "react";
+import { Button, type ButtonProps } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+/**
+ * TooltipButton - A button with built-in tooltip support
+ * Reduces repeated TooltipProvider/Tooltip/TooltipTrigger boilerplate
+ */
+export interface TooltipButtonProps extends ButtonProps {
+  /** Tooltip content - can be string or ReactNode */
+  tooltip: React.ReactNode;
+  /** Icon to display in the button */
+  icon?: React.ReactNode;
+  /** Side of the button to show the tooltip */
+  tooltipSide?: "top" | "right" | "bottom" | "left";
+}
+
+export function TooltipButton({
+  tooltip,
+  icon,
+  tooltipSide = "bottom",
+  children,
+  ...buttonProps
+}: TooltipButtonProps) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button {...buttonProps}>
+            {icon}
+            {children}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={tooltipSide}>
+          {typeof tooltip === "string" ? <p>{tooltip}</p> : tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * TooltipWrapper - Wrap any element with a tooltip
+ * Use this when you need tooltip on non-button elements
+ */
+export interface TooltipWrapperProps {
+  /** Tooltip content - can be string or ReactNode */
+  tooltip: React.ReactNode;
+  /** The element to wrap */
+  children: React.ReactNode;
+  /** Side to show the tooltip */
+  side?: "top" | "right" | "bottom" | "left";
+  /** Whether the child is a single React element (use asChild) */
+  asChild?: boolean;
+}
+
+export function TooltipWrapper({
+  tooltip,
+  children,
+  side = "bottom",
+  asChild = true,
+}: TooltipWrapperProps) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild={asChild}>{children}</TooltipTrigger>
+        <TooltipContent side={side}>
+          {typeof tooltip === "string" ? <p>{tooltip}</p> : tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}

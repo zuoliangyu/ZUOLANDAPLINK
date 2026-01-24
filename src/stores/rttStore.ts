@@ -16,8 +16,8 @@ function loadChartConfig(): ChartConfig {
     if (saved) {
       return { ...DEFAULT_CHART_CONFIG, ...JSON.parse(saved) };
     }
-  } catch (error) {
-    console.error("加载图表配置失败:", error);
+  } catch {
+    // 静默处理，使用默认值
   }
   return DEFAULT_CHART_CONFIG;
 }
@@ -25,8 +25,8 @@ function loadChartConfig(): ChartConfig {
 function saveChartConfig(config: ChartConfig) {
   try {
     localStorage.setItem(CHART_CONFIG_KEY, JSON.stringify(config));
-  } catch (error) {
-    console.error("保存图表配置失败:", error);
+  } catch {
+    // 静默处理
   }
 }
 
@@ -36,8 +36,8 @@ function loadViewMode(): ViewMode {
     if (saved && (saved === "text" || saved === "chart" || saved === "split")) {
       return saved as ViewMode;
     }
-  } catch (error) {
-    console.error("加载视图模式失败:", error);
+  } catch {
+    // 静默处理，使用默认值
   }
   return "text";
 }
@@ -45,8 +45,8 @@ function loadViewMode(): ViewMode {
 function saveViewMode(mode: ViewMode) {
   try {
     localStorage.setItem(VIEW_MODE_KEY, mode);
-  } catch (error) {
-    console.error("保存视图模式失败:", error);
+  } catch {
+    // 静默处理
   }
 }
 
@@ -59,8 +59,8 @@ function loadSplitRatio(): number {
         return ratio;
       }
     }
-  } catch (error) {
-    console.error("加载分屏比例失败:", error);
+  } catch {
+    // 静默处理，使用默认值
   }
   return 0.4; // 默认 40% 文本，60% 图表
 }
@@ -68,8 +68,8 @@ function loadSplitRatio(): number {
 function saveSplitRatio(ratio: number) {
   try {
     localStorage.setItem(SPLIT_RATIO_KEY, ratio.toString());
-  } catch (error) {
-    console.error("保存分屏比例失败:", error);
+  } catch {
+    // 静默处理
   }
 }
 

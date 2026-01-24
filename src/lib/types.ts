@@ -109,6 +109,29 @@ export interface PackInfo {
   device_count: number;
 }
 
+// Pack 扫描报告
+export interface PackScanReport {
+  pack_name: string;
+  scan_time: string;
+  total_devices: number;
+  devices_with_algo: number;
+  devices_without_algo: number;
+  algorithm_stats: AlgorithmStat[];
+  devices: DeviceScanResult[];
+}
+
+export interface AlgorithmStat {
+  algorithm_name: string;
+  device_count: number;
+}
+
+export interface DeviceScanResult {
+  name: string;
+  core: string;
+  flash_size: number;
+  status: "Success" | "Warning" | "Error";
+}
+
 // 项目配置
 export interface ProjectConfig {
   name: string;

@@ -12,8 +12,8 @@ function loadAppMode(): AppMode {
     if (saved === "flash" || saved === "rtt") {
       return saved;
     }
-  } catch (error) {
-    console.error("Failed to load app mode:", error);
+  } catch {
+    // 静默处理，使用默认值
   }
   return "flash"; // Default to flash mode
 }
@@ -21,8 +21,8 @@ function loadAppMode(): AppMode {
 function saveAppMode(mode: AppMode) {
   try {
     localStorage.setItem(APP_MODE_KEY, mode);
-  } catch (error) {
-    console.error("Failed to save app mode:", error);
+  } catch {
+    // 静默处理
   }
 }
 

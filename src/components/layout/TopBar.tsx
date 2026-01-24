@@ -6,7 +6,7 @@ import { useFlashStore } from "@/stores/flashStore";
 import { useChipStore } from "@/stores/chipStore";
 import { useAppStore } from "@/stores/appStore";
 import { Cpu, FileCode, Loader2 } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipWrapper } from "@/components/ui/tooltip-button";
 
 export function TopBar() {
   const { connected, selectedProbe } = useProbeStore();
@@ -39,36 +39,22 @@ export function TopBar() {
       <div className="flex-1 flex items-center justify-center gap-4 text-xs text-muted-foreground">
         {/* Current chip info */}
         {selectedChip && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50">
-                  <Cpu className="h-3 w-3" />
-                  <span className="font-mono text-[11px]">{selectedChip}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>当前目标芯片</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <TooltipWrapper tooltip="当前目标芯片">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50">
+              <Cpu className="h-3 w-3" />
+              <span className="font-mono text-[11px]">{selectedChip}</span>
+            </div>
+          </TooltipWrapper>
         )}
 
         {/* Firmware file (in flash mode) */}
         {mode === "flash" && firmwareFileName && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50 max-w-[180px]">
-                  <FileCode className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate text-[11px]">{firmwareFileName}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-[300px] break-all">{firmwarePath}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <TooltipWrapper tooltip={<p className="max-w-[300px] break-all">{firmwarePath}</p>}>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50 max-w-[180px]">
+              <FileCode className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate text-[11px]">{firmwareFileName}</span>
+            </div>
+          </TooltipWrapper>
         )}
 
         {/* Flashing progress */}
@@ -123,19 +109,18 @@ export function TopBar() {
 
         {/* Probe info when connected */}
         {connected && selectedProbe && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-[10px] text-muted-foreground/70 max-w-[100px] truncate">
-                  {selectedProbe.identifier.split(" ")[0]}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
+          <TooltipWrapper
+            tooltip={
+              <>
                 <p>{selectedProbe.identifier}</p>
                 {selectedProbe.dap_version && <p className="text-xs text-muted-foreground">{selectedProbe.dap_version}</p>}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </>
+            }
+          >
+            <span className="text-[10px] text-muted-foreground/70 max-w-[100px] truncate">
+              {selectedProbe.identifier.split(" ")[0]}
+            </span>
+          </TooltipWrapper>
         )}
       </div>
     </header>

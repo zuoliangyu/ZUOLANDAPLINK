@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type Update, type DownloadEvent } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ import { useLogStore } from "@/stores/logStore";
 
 export function UpdateChecker() {
   const [checking, setChecking] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -50,7 +50,6 @@ export function UpdateChecker() {
       if (!silent) {
         addLog("error", `检查更新失败: ${error}`);
       }
-      console.warn("检查更新失败:", error);
     } finally {
       setChecking(false);
     }
@@ -63,15 +62,21 @@ export function UpdateChecker() {
       setDownloading(true);
       addLog("info", "开始下载更新...");
 
-      await updateInfo.downloadAndInstall((event: any) => {
+      await updateInfo.downloadAndInstall((event: DownloadEvent) => {
         switch (event.event) {
-          case "Started":
-            addLog("info", `开始下载: ${event.data.contentLength} 字节`);
+          case "Started": {
+            const data = event.data as { contentLength?: number };
+            if (data.contentLength) {
+              addLog("info", `开始下载: ${data.contentLength} 字节`);
+            }
             break;
-          case "Progress":
-            const progress = (event.data.chunkLength / event.data.contentLength) * 100;
+          }
+          case "Progress": {
+            const data = event.data as { chunkLength: number; contentLength: number };
+            const progress = (data.chunkLength / data.contentLength) * 100;
             setDownloadProgress(progress);
             break;
+          }
           case "Finished":
             addLog("success", "下载完成，准备安装...");
             break;
@@ -86,7 +91,6 @@ export function UpdateChecker() {
       }, 2000);
     } catch (error) {
       addLog("error", `更新失败: ${error}`);
-      console.error("更新失败:", error);
       setDownloading(false);
     }
   };

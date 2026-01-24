@@ -189,8 +189,8 @@ export function loadColorParserConfig(): ColorParserConfig {
         tags: config.tags || DEFAULT_COLOR_TAGS,
       };
     }
-  } catch (error) {
-    console.error('Failed to load color parser config:', error);
+  } catch {
+    // 静默处理，使用默认值
   }
   return DEFAULT_PARSER_CONFIG;
 }

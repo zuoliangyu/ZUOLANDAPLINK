@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Settings, Plus, Trash2 } from "lucide-react";
-import type { ChartConfig } from "@/lib/chartTypes";
+import type { ChartConfig, ParseMode, ChartType } from "@/lib/chartTypes";
 import { PRESET_COLORS } from "@/lib/chartTypes";
 
 interface ChartConfigDialogProps {
@@ -138,7 +138,7 @@ export function ChartConfigDialog({ trigger }: ChartConfigDialogProps) {
               <Label htmlFor="parseMode">解析模式</Label>
               <Select
                 value={localConfig.parseMode}
-                onValueChange={(value: any) =>
+                onValueChange={(value: ParseMode) =>
                   setLocalConfig({ ...localConfig, parseMode: value })
                 }
               >
@@ -158,7 +158,7 @@ export function ChartConfigDialog({ trigger }: ChartConfigDialogProps) {
               <Label htmlFor="chartType">图表类型</Label>
               <Select
                 value={localConfig.chartType}
-                onValueChange={(value: any) =>
+                onValueChange={(value: ChartType) =>
                   setLocalConfig({ ...localConfig, chartType: value })
                 }
               >

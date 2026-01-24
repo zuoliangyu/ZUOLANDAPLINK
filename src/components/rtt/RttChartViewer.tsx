@@ -27,6 +27,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+// Brush 缩放范围类型
+interface BrushDomain {
+  startIndex?: number;
+  endIndex?: number;
+}
+
 export function RttChartViewer() {
   const {
     chartData,
@@ -39,7 +45,7 @@ export function RttChartViewer() {
   } = useRttStore();
 
   // 缩放范围状态
-  const [zoomDomain, setZoomDomain] = useState<{ startIndex?: number; endIndex?: number }>({});
+  const [zoomDomain, setZoomDomain] = useState<BrushDomain>({});
 
   // 格式化时间戳为可读格式（简化版）
   const formatTimestamp = (timestamp: number, _index: number, firstTimestamp: number) => {
@@ -353,7 +359,7 @@ export function RttChartViewer() {
                   stroke="#8884d8"
                   startIndex={zoomDomain.startIndex}
                   endIndex={zoomDomain.endIndex}
-                  onChange={(domain: any) => setZoomDomain(domain)}
+                  onChange={(domain: BrushDomain) => setZoomDomain(domain)}
                 />
                 {visibleSeries.map((series) => (
                   <Line
@@ -389,7 +395,7 @@ export function RttChartViewer() {
                   stroke="#8884d8"
                   startIndex={zoomDomain.startIndex}
                   endIndex={zoomDomain.endIndex}
-                  onChange={(domain: any) => setZoomDomain(domain)}
+                  onChange={(domain: BrushDomain) => setZoomDomain(domain)}
                 />
                 {visibleSeries.map((series) => (
                   <Bar
@@ -429,7 +435,7 @@ export function RttChartViewer() {
                   stroke="#8884d8"
                   startIndex={zoomDomain.startIndex}
                   endIndex={zoomDomain.endIndex}
-                  onChange={(domain: any) => setZoomDomain(domain)}
+                  onChange={(domain: BrushDomain) => setZoomDomain(domain)}
                 />
                 {visibleSeries.map((series) => (
                   <Scatter
@@ -462,7 +468,7 @@ export function RttChartViewer() {
                   stroke="#8884d8"
                   startIndex={zoomDomain.startIndex}
                   endIndex={zoomDomain.endIndex}
-                  onChange={(domain: any) => setZoomDomain(domain)}
+                  onChange={(domain: BrushDomain) => setZoomDomain(domain)}
                 />
                 {visibleSeries.map((series) => (
                   <Scatter

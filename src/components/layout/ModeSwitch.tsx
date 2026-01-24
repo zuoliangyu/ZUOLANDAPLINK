@@ -1,6 +1,6 @@
 import { Zap, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipWrapper } from "@/components/ui/tooltip-button";
 import { useAppStore, type AppMode } from "@/stores/appStore";
 import { useRttStore } from "@/stores/rttStore";
 import { useFlashStore } from "@/stores/flashStore";
@@ -55,51 +55,37 @@ export function ModeSwitch({ className }: ModeSwitchProps) {
   return (
     <>
       <div className={cn("flex items-center gap-1 bg-muted/50 rounded-lg p-1", className)}>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={mode === "flash" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleModeChange("flash")}
-                disabled={flashing}
-                className={cn(
-                  "gap-1.5 h-7 px-3",
-                  mode === "flash" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <Zap className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">烧录</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>烧录模式 - 固件烧录、擦除、校验 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+1</kbd></p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <TooltipWrapper tooltip={<p>烧录模式 - 固件烧录、擦除、校验 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+1</kbd></p>}>
+          <Button
+            variant={mode === "flash" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => handleModeChange("flash")}
+            disabled={flashing}
+            className={cn(
+              "gap-1.5 h-7 px-3",
+              mode === "flash" && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            <span className="text-xs font-medium">烧录</span>
+          </Button>
+        </TooltipWrapper>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={mode === "rtt" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => handleModeChange("rtt")}
-                disabled={flashing}
-                className={cn(
-                  "gap-1.5 h-7 px-3",
-                  mode === "rtt" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <Terminal className="h-3.5 w-3.5" />
-                <span className="text-xs font-medium">RTT</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>RTT 模式 - 实时数据传输和调试 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+2</kbd></p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <TooltipWrapper tooltip={<p>RTT 模式 - 实时数据传输和调试 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+2</kbd></p>}>
+          <Button
+            variant={mode === "rtt" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => handleModeChange("rtt")}
+            disabled={flashing}
+            className={cn(
+              "gap-1.5 h-7 px-3",
+              mode === "rtt" && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span className="text-xs font-medium">RTT</span>
+          </Button>
+        </TooltipWrapper>
       </div>
 
       {/* Confirmation dialog when RTT is running */}

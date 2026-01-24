@@ -23,7 +23,7 @@ import {
   deletePack,
   getPackScanReport,
 } from "@/lib/tauri";
-import type { PackInfo } from "@/lib/types";
+import type { PackInfo, PackScanReport, AlgorithmStat, DeviceScanResult } from "@/lib/types";
 import { useLogStore } from "@/stores/logStore";
 import { Package, Upload, Trash2, ChevronDown, ChevronRight, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ export function PackManager() {
   const [isDragging, setIsDragging] = useState(false);
   const [scanProgress, setScanProgress] = useState<PackScanProgress | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
-  const [selectedPackReport, setSelectedPackReport] = useState<any>(null);
+  const [selectedPackReport, setSelectedPackReport] = useState<PackScanReport | null>(null);
   const addLog = useLogStore((state) => state.addLog);
 
   // Load imported Pack list
@@ -374,7 +374,7 @@ export function PackManager() {
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium">算法使用统计</h3>
                   <div className="space-y-1">
-                    {selectedPackReport.algorithm_stats.slice(0, 5).map((stat: any) => (
+                    {selectedPackReport.algorithm_stats.slice(0, 5).map((stat: AlgorithmStat) => (
                       <div key={stat.algorithm_name} className="flex items-center justify-between text-xs border rounded p-2">
                         <span className="font-mono">{stat.algorithm_name}</span>
                         <span className="text-muted-foreground">{stat.device_count} 个设备</span>
@@ -393,9 +393,9 @@ export function PackManager() {
                   </h3>
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {selectedPackReport.devices
-                      .filter((d: any) => d.status === "Warning")
+                      .filter((d: DeviceScanResult) => d.status === "Warning")
                       .slice(0, 20)
-                      .map((device: any) => (
+                      .map((device: DeviceScanResult) => (
                         <div key={device.name} className="text-xs border rounded p-2 bg-yellow-50 dark:bg-yellow-950">
                           <div className="font-medium">{device.name}</div>
                           <div className="text-muted-foreground">
