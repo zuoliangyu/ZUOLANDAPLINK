@@ -64,11 +64,28 @@ export function Sidebar() {
     try {
       setLoading(true);
       const probeList = await listProbes();
+
+      // 🔍 调试日志：查看探针列表数据
+      console.log("=== 探针列表调试 ===");
+      console.log("探针数量:", probeList.length);
+      console.log("探针详细信息:", JSON.stringify(probeList, null, 2));
+      probeList.forEach((probe, index) => {
+        console.log(`探针 ${index + 1}:`, {
+          identifier: probe.identifier,
+          probe_type: probe.probe_type,
+          dap_version: probe.dap_version,
+          vendor_id: probe.vendor_id,
+          product_id: probe.product_id,
+        });
+      });
+      console.log("==================");
+
       setProbes(probeList);
 
       // 自动选择第一个探针（如果有且当前没有选择）
       if (probeList.length > 0 && !selectedProbe) {
         selectProbe(probeList[0]);
+        console.log("🔍 自动选择的探针:", probeList[0]);
         addLog("info", `检测到 ${probeList.length} 个探针，已自动选择第一个`);
       } else {
         addLog("info", `检测到 ${probeList.length} 个探针`);
@@ -166,6 +183,13 @@ export function Sidebar() {
     }
   };
 
+  // 🔍 调试日志：查看当前选中的探针
+  console.log("🔍 当前渲染状态:", {
+    selectedProbe: selectedProbe,
+    hasDapVersion: selectedProbe?.dap_version ? "有" : "无",
+    dapVersion: selectedProbe?.dap_version,
+  });
+
   return (
     <aside className="w-72 border-r border-border bg-muted/30 overflow-y-auto p-3 space-y-3">
       {/* 探针选择 */}
@@ -194,15 +218,26 @@ export function Sidebar() {
             disabled={connected}
           >
             <SelectTrigger>
-              <SelectValue placeholder="选择探针" />
+              {selectedProbe ? (
+                <div className="flex items-center gap-2 w-full">
+                  <span className="truncate flex-1 text-left">{selectedProbe.identifier}</span>
+                  {selectedProbe.dap_version && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium shrink-0">
+                      {selectedProbe.dap_version}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">选择探针</span>
+              )}
             </SelectTrigger>
             <SelectContent>
               {probes.map((probe) => (
                 <SelectItem key={probe.identifier} value={probe.identifier}>
-                  <div className="flex flex-col">
-                    <span>{probe.identifier}</span>
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    <span className="truncate">{probe.identifier}</span>
                     {probe.dap_version && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium shrink-0">
                         {probe.dap_version}
                       </span>
                     )}
@@ -473,9 +508,14 @@ export function Sidebar() {
                 </span>
               </div>
             )}
-            <div className="text-[10px] text-muted-foreground mt-2 pt-2 border-t">
-              注：目标IDCODE需通过Keil等工具查看
-            </div>
+            {connectionInfo.target_idcode !== null && connectionInfo.target_idcode !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">DP IDCODE:</span>
+                <span className="font-mono">
+                  0x{connectionInfo.target_idcode.toString(16).toUpperCase().padStart(8, '0')}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

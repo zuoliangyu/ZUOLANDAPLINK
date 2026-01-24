@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.1] - 2026-01-25
+
+### 新增功能
+- ✨ **DP IDCODE 显示** - 连接后显示调试端口标识码 (DPIDR)，便于识别目标芯片调试接口
+
+### 改进
+- 🔧 **DAP 版本检测优化** - 改进探针类型检测逻辑，支持更多 CMSIS-DAP 命名格式
+
 ## [0.6.0] - 2026-01-25
 
 ### 重大新增

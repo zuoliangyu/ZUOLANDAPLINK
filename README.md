@@ -2,7 +2,7 @@
 
 一个开源的嵌入式开发三合一工具，集成**固件烧录**、**RTT 调试**和**串口终端**功能。基于 Tauri + React + Rust 技术栈开发，使用 probe-rs 作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.6.0-blue)
+![Version](https://img.shields.io/badge/version-0.6.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 核心特性
@@ -32,7 +32,9 @@
 
 ### 探针和接口支持
 
-- **探针类型**：CMSIS-DAP（DAPv1 HID / DAPv2 WinUSB）、J-Link、ST-Link
+- **探针类型**：CMSIS-DAP（DAPv1 HID / DAPv2 WinUSB）
+  - 自动识别并显示 DAP 版本标记
+  - 理论上支持 probe-rs 兼容的其他探针（J-Link、ST-Link 等），但未经测试
 - **调试接口**：SWD / JTAG
 - **时钟速度**：100kHz - 10MHz（默认 1MHz）
 - **连接模式**：正常模式 / 复位下连接
@@ -349,7 +351,7 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 
 #### CMSIS-DAP 注意事项
 
-使用 CMSIS-DAP/DAPLINK 探针时，RTT 读取需要暂停目标芯片才能安全访问内存（与 J-Link 不同）。
+使用 CMSIS-DAP/DAPLINK 探针时，RTT 读取需要暂停目标芯片才能安全访问内存。
 
 **影响**：
 - RTT 读取时目标芯片会被短暂暂停（约 1-2ms），然后恢复运行
@@ -359,7 +361,6 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 **重要配置**：
 - **必须配置为非阻塞模式**，否则缓冲区满时目标会卡死
 - 轮询间隔默认 10ms，可根据需要调整
-- 如果目标程序对实时性要求极高，建议使用 J-Link 探针
 
 ### 串口模式使用
 

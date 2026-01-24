@@ -1,6 +1,7 @@
 use crate::error::{AppError, AppResult};
 use crate::state::{AppState, ConnectionInfo, ConnectMode, InterfaceType};
 use probe_rs::{
+    architecture::arm::dp::{DpAddress, DpRegisterAddress},
     probe::{list::Lister, WireProtocol},
     MemoryInterface, Permissions, Session,
 };
@@ -60,6 +61,23 @@ fn read_chip_id(session: &mut Session) -> Option<u32> {
     None
 }
 
+/// Try to read the DP IDCODE (DPIDR) from the debug port
+/// This identifies the debug access port implementation
+fn read_dp_idcode(session: &mut Session) -> Option<u32> {
+    // Get ARM interface and read DPIDR
+    if let Ok(interface) = session.get_arm_interface() {
+        // DPIDR register: address 0x0, no bank selection
+        let dp_addr = DpAddress::Default;
+        let reg_addr = DpRegisterAddress { address: 0x0, bank: None };
+        if let Ok(dpidr) = interface.read_raw_dp_register(dp_addr, reg_addr) {
+            if dpidr != 0 && dpidr != 0xFFFFFFFF {
+                return Some(dpidr);
+            }
+        }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn list_probes() -> AppResult<Vec<ProbeInfo>> {
     let lister = Lister::new();
@@ -70,9 +88,11 @@ pub async fn list_probes() -> AppResult<Vec<ProbeInfo>> {
         .map(|p| {
             let probe_type_str = format!("{:?}", p.probe_type());
 
-            // 判断DAP版本：CmsisDap表示DAPv1(HID)，CmsisDapV2表示DAPv2(WinUSB)
-            let dap_version = if probe_type_str.contains("CmsisDap") {
-                if probe_type_str.contains("V2") {
+            // 判断DAP版本：支持 CMSIS-DAP 和 CmsisDap 两种格式
+            // probe_type 可能是 "CMSIS-DAP" 或 "CmsisDap" 或 "CmsisDapV2"
+            let probe_type_upper = probe_type_str.to_uppercase();
+            let dap_version = if probe_type_upper.contains("CMSIS") || probe_type_upper.contains("DAP") {
+                if probe_type_upper.contains("V2") {
                     Some("DAPv2 (WinUSB)".to_string())
                 } else {
                     Some("DAPv1 (HID)".to_string())
@@ -144,12 +164,6 @@ pub async fn connect_target(
             .map_err(|e| AppError::ProbeError(format!("设置时钟速度失败 ({} kHz): {}", speed_khz, e)))?;
     }
 
-    // 尝试在连接前读取目标IDCODE
-    // 注意：probe-rs 0.27版本的API不直接暴露DP IDCODE读取
-    // IDCODE在连接时由probe-rs内部读取，但无法通过公开API获取
-    // 这是probe-rs的已知限制，未来版本可能会改进
-    let target_idcode: Option<u32> = None;
-
     // 连接目标
     let mut session = if options.connect_mode == ConnectMode::UnderReset {
         probe
@@ -163,6 +177,9 @@ pub async fn connect_target(
 
     // 读取芯片ID（DBGMCU_IDCODE）
     let chip_id = read_chip_id(&mut session);
+
+    // 读取 DP IDCODE (DPIDR) - 调试端口标识码
+    let target_idcode = read_dp_idcode(&mut session);
 
     // 获取目标信息
     let target = session.target();
@@ -305,8 +322,6 @@ pub async fn connect_rtt(
             .map_err(|e| AppError::ProbeError(format!("设置时钟速度失败 ({} kHz): {}", speed_khz, e)))?;
     }
 
-    let target_idcode: Option<u32> = None;
-
     // 连接目标
     let mut session = if options.connect_mode == ConnectMode::UnderReset {
         probe
@@ -320,6 +335,9 @@ pub async fn connect_rtt(
 
     // 读取芯片ID
     let chip_id = read_chip_id(&mut session);
+
+    // 读取 DP IDCODE (DPIDR) - 调试端口标识码
+    let target_idcode = read_dp_idcode(&mut session);
 
     // 获取目标信息
     let target = session.target();
