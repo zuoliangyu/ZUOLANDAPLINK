@@ -40,10 +40,23 @@ jobs:
             os_name: linux
 
     runs-on: ${{ matrix.platform }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.CHANGELOG }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # 提取版本号
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION_NUM="${VERSION#v}"
+          echo "version=$VERSION_NUM" >> $GITHUB_OUTPUT
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
 
       # Linux 依赖
       - name: Install Linux dependencies
@@ -186,3 +199,223 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: --target ${{ matrix.target }} ${{ matrix.os_name == 'windows' && '--bundles nsis' || '' }}
+
+      # 保存平台键名到 artifact（用于后续合并）
+      - name: Save platform info
+        shell: bash
+        run: |
+          TARGET="${{ matrix.target }}"
+          mkdir -p platform-info
+
+          case "$TARGET" in
+            "x86_64-pc-windows-msvc")
+              echo "windows-x86_64" > platform-info/platform.txt
+              ;;
+            "aarch64-apple-darwin")
+              echo "darwin-aarch64" > platform-info/platform.txt
+              ;;
+            "x86_64-unknown-linux-gnu")
+              echo "linux-x86_64" > platform-info/platform.txt
+              ;;
+          esac
+
+      - name: Upload platform info
+        uses: actions/upload-artifact@v4
+        with:
+          name: platform-${{ matrix.target }}
+          path: platform-info/
+          retention-days: 1
+
+  # 合并所有平台的更新信息并规范化文件名
+  merge-updater:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for Release assets to be accessible
+        # needs: build 已确保所有构建完成，这里只等待 GitHub API 缓冲
+        run: sleep 120
+
+      - name: Normalize update package names (ensure version in filename)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          TAG="v${VERSION}"
+          REPO="zuoliangyu/ZUOLANDAPLINK"
+
+          echo "Checking and normalizing update package names for version ${VERSION}"
+
+          # 获取 Release 资产列表
+          ASSETS=$(gh api repos/${REPO}/releases/tags/${TAG} --jq '.assets[] | "\(.name)|\(.id)"' 2>/dev/null || echo "")
+
+          if [ -z "$ASSETS" ]; then
+            echo "Warning: Could not fetch release assets"
+            exit 0
+          fi
+
+          mkdir -p downloads
+
+          # 检查 macOS 更新包
+          MAC_FILE=$(echo "$ASSETS" | grep -E '\.app\.tar\.gz\|' | head -1 || true)
+          if [ -n "$MAC_FILE" ]; then
+            MAC_NAME=$(echo "$MAC_FILE" | cut -d'|' -f1)
+            MAC_ID=$(echo "$MAC_FILE" | cut -d'|' -f2)
+
+            # 检查文件名是否包含版本号
+            if [[ ! "$MAC_NAME" =~ _${VERSION}_ ]]; then
+              echo "macOS file needs renaming: ${MAC_NAME}"
+              NEW_MAC_NAME="ZUOLAN.DAPLINK_${VERSION}_aarch64.app.tar.gz"
+
+              # 下载文件
+              gh release download "$TAG" --pattern "$MAC_NAME" --dir downloads
+              mv "downloads/${MAC_NAME}" "downloads/${NEW_MAC_NAME}"
+
+              # 上传新文件
+              gh release upload "$TAG" "downloads/${NEW_MAC_NAME}" --clobber
+
+              # 删除旧文件
+              gh release delete-asset "$TAG" "$MAC_NAME" -y 2>/dev/null || true
+
+              echo "Renamed: ${MAC_NAME} -> ${NEW_MAC_NAME}"
+            else
+              echo "macOS file already has version: ${MAC_NAME}"
+            fi
+          fi
+
+          # 检查 Windows 更新包
+          WIN_FILE=$(echo "$ASSETS" | grep -E '\.nsis\.zip\|' | head -1 || true)
+          if [ -n "$WIN_FILE" ]; then
+            WIN_NAME=$(echo "$WIN_FILE" | cut -d'|' -f1)
+
+            # 检查文件名是否包含版本号
+            if [[ ! "$WIN_NAME" =~ _${VERSION}_ ]]; then
+              echo "Windows file needs renaming: ${WIN_NAME}"
+              NEW_WIN_NAME="ZUOLAN.DAPLINK_${VERSION}_x64-setup.nsis.zip"
+
+              gh release download "$TAG" --pattern "$WIN_NAME" --dir downloads
+              mv "downloads/${WIN_NAME}" "downloads/${NEW_WIN_NAME}"
+              gh release upload "$TAG" "downloads/${NEW_WIN_NAME}" --clobber
+              gh release delete-asset "$TAG" "$WIN_NAME" -y 2>/dev/null || true
+
+              echo "Renamed: ${WIN_NAME} -> ${NEW_WIN_NAME}"
+            else
+              echo "Windows file already has version: ${WIN_NAME}"
+            fi
+          fi
+
+          # 检查 Linux 更新包
+          LINUX_FILE=$(echo "$ASSETS" | grep -E '\.AppImage\.tar\.gz\|' | head -1 || true)
+          if [ -n "$LINUX_FILE" ]; then
+            LINUX_NAME=$(echo "$LINUX_FILE" | cut -d'|' -f1)
+
+            # 检查文件名是否包含版本号
+            if [[ ! "$LINUX_NAME" =~ _${VERSION}_ ]]; then
+              echo "Linux file needs renaming: ${LINUX_NAME}"
+              NEW_LINUX_NAME="ZUOLAN.DAPLINK_${VERSION}_amd64.AppImage.tar.gz"
+
+              gh release download "$TAG" --pattern "$LINUX_NAME" --dir downloads
+              mv "downloads/${LINUX_NAME}" "downloads/${NEW_LINUX_NAME}"
+              gh release upload "$TAG" "downloads/${NEW_LINUX_NAME}" --clobber
+              gh release delete-asset "$TAG" "$LINUX_NAME" -y 2>/dev/null || true
+
+              echo "Renamed: ${LINUX_NAME} -> ${NEW_LINUX_NAME}"
+            else
+              echo "Linux file already has version: ${LINUX_NAME}"
+            fi
+          fi
+
+          echo "Normalization complete"
+
+      - name: Generate merged latest.json
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          TAG="v${VERSION}"
+          REPO="zuoliangyu/ZUOLANDAPLINK"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "Generating merged latest.json for version ${VERSION}"
+
+          # 从 CHANGELOG.md 提取当前版本的内容
+          CHANGELOG=$(awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="查看完整更新日志: https://github.com/${REPO}/blob/main/CHANGELOG.md"
+          fi
+
+          # 使用规范化后的文件名 URL
+          PLATFORMS=""
+
+          # Windows (带版本号格式)
+          WIN_URL="https://github.com/${REPO}/releases/download/${TAG}/ZUOLAN.DAPLINK_${VERSION}_x64-setup.nsis.zip"
+          # 检查文件是否存在
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -q "ZUOLAN.DAPLINK_${VERSION}_x64-setup.nsis.zip"; then
+            PLATFORMS="${PLATFORMS}\"windows-x86_64\": {\"signature\": \"\", \"url\": \"${WIN_URL}\"},"
+            echo "Added Windows platform"
+          fi
+
+          # macOS (带版本号格式)
+          MAC_URL="https://github.com/${REPO}/releases/download/${TAG}/ZUOLAN.DAPLINK_${VERSION}_aarch64.app.tar.gz"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -q "ZUOLAN.DAPLINK_${VERSION}_aarch64.app.tar.gz"; then
+            PLATFORMS="${PLATFORMS}\"darwin-aarch64\": {\"signature\": \"\", \"url\": \"${MAC_URL}\"},"
+            echo "Added macOS platform"
+          fi
+
+          # Linux (带版本号格式)
+          LINUX_URL="https://github.com/${REPO}/releases/download/${TAG}/ZUOLAN.DAPLINK_${VERSION}_amd64.AppImage.tar.gz"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -q "ZUOLAN.DAPLINK_${VERSION}_amd64.AppImage.tar.gz"; then
+            PLATFORMS="${PLATFORMS}\"linux-x86_64\": {\"signature\": \"\", \"url\": \"${LINUX_URL}\"},"
+            echo "Added Linux platform"
+          fi
+
+          # 移除末尾逗号
+          PLATFORMS=$(echo "$PLATFORMS" | sed 's/,$//')
+
+          if [ -z "$PLATFORMS" ]; then
+            echo "Warning: No update packages found, creating placeholder latest.json"
+            PLATFORMS="\"placeholder\": {\"signature\": \"\", \"url\": \"\"}"
+          fi
+
+          # 转义 CHANGELOG 中的特殊字符用于 JSON
+          CHANGELOG_JSON=$(echo "$CHANGELOG" | jq -Rs '.')
+
+          # 生成 latest.json
+          cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": ${CHANGELOG_JSON},
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              ${PLATFORMS}
+            }
+          }
+          EOF
+
+          # 格式化 JSON
+          cat latest.json | jq '.' > latest_formatted.json
+          mv latest_formatted.json latest.json
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+      - name: Delete old latest.json from Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.build.outputs.version }}"
+          # 删除可能已存在的 latest.json（由各平台 job 上传的）
+          gh release delete-asset $TAG latest.json -y 2>/dev/null || true
+
+      - name: Upload merged latest.json to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          files: latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

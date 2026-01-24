@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.3] - 2026-01-24
+
+### 改进
+- 🔧 **自动更新修复** - 修复多平台 latest.json 合并问题
+  - 添加 merge-updater job 自动合并所有平台更新信息
+  - 规范化更新包文件名，确保所有平台都带版本号
+  - 修复 latest.json 不完整导致部分平台无法检测更新的问题
+
 ## [0.5.2] - 2026-01-24
 
 ### 改进
