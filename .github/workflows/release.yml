@@ -170,8 +170,7 @@ jobs:
 
             | 平台 | 文件 | 说明 |
             |------|------|------|
-            | **Windows** | `*_x64-setup.exe` | NSIS 安装程序 |
-            | **Windows** | `*_x64_portable.exe` | 便携版 (绿色版，推荐) |
+            | **Windows** | `*_x64-setup.exe` | NSIS 安装程序 (推荐) |
             | **Windows** | `*_x64_en-US.msi` | MSI 安装包 |
             | **macOS (Apple Silicon)** | `*_aarch64.dmg` | M1/M2/M3芯片Mac |
             | **Linux** | `*_amd64.deb` | Debian/Ubuntu |
@@ -181,11 +180,6 @@ jobs:
             - **Windows**: Windows 10/11 64位，需要WebView2运行时
             - **macOS**: macOS 11.0+ (Big Sur或更高), Apple Silicon
             - **Linux**: 需要WebKitGTK和libusb
-
-            ### 🎯 便携版说明
-            - 便携版无需安装，下载后直接运行
-            - 所有配置和数据保存在程序目录
-            - 适合U盘携带或多台电脑使用
 
 
             完整更新历史: [CHANGELOG.md](https://github.com/zuoliangyu/ZUOLANDAPLINK/blob/main/CHANGELOG.md)

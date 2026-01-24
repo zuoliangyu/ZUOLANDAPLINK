@@ -39,9 +39,6 @@
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
-      },
-      "nsis": {
-        "portable": true
       }
     },
     "macOS": {
