@@ -2,7 +2,7 @@
 
 一个开源的第三方DAPLINKhe RTTview实现软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.5.0-blue)
+![Version](https://img.shields.io/badge/version-0.5.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性
