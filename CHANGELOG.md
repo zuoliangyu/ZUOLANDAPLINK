@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.4] - 2026-01-24
+
+### 修复
+- 🔐 **配置签名密钥** - 启用 Tauri updater 签名验证
+  - 配置公钥用于验证更新包完整性
+  - 修复 Windows/Linux 平台不生成更新包的问题
+  - 现在所有平台都能正确检测和安装更新
+
 ## [0.5.3] - 2026-01-24
 
 ### 改进
