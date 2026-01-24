@@ -184,4 +184,5 @@ jobs:
             完整更新历史: [CHANGELOG.md](https://github.com/zuoliangyu/ZUOLANDAPLINK/blob/main/CHANGELOG.md)
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
           args: --target ${{ matrix.target }} ${{ matrix.os_name == 'windows' && '--bundles nsis' || '' }}
