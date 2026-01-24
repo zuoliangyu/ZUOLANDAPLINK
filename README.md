@@ -2,7 +2,7 @@
 
 一个开源的第三方DAPLINK烧录软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-0.4.0--beta.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性
@@ -11,6 +11,7 @@
 - **探针检测** - 自动检测连接的DAPLINK/CMSIS-DAP设备，显示DAP版本（DAPv1 HID / DAPv2 WinUSB）
 - **多接口支持** - 支持SWD和JTAG调试接口，可调节时钟速度（100kHz - 10MHz）
 - **固件烧录** - 支持ELF/HEX/BIN格式固件烧录，支持全片擦除和扇区擦除
+- **Flash算法选择** - 支持手动选择Flash算法，可从CMSIS-Pack导入自定义算法
 - **Flash操作** - 支持Flash读取、校验、擦除等完整操作
 - **内存访问** - 支持内存读写和寄存器查看
 - **芯片数据库** - 内置150+常用芯片，支持Keil CMSIS-Pack扩展
