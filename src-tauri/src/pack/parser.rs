@@ -4,6 +4,9 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 
 pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
+    #[cfg(debug_assertions)]
+    println!("\n🔍 开始解析 PDSC 文件 (文件大小: {} 字节)", content.len());
+
     let mut reader = Reader::from_str(content);
     reader.config_mut().trim_text(true);
 
@@ -16,6 +19,7 @@ pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
     let mut in_package = false;
     let mut in_description = false;
     let mut in_devices = false;
+    let mut package_description_read = false; // 标记是否已读取 package 的 description
 
     let mut buf = Vec::new();
 
@@ -40,8 +44,12 @@ pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
                 _ => {}
             },
             Ok(Event::Text(e)) => {
-                if in_description {
+                // 只读取 package 级别的 description，忽略 subFamily 等的 description
+                if in_description && in_package && !package_description_read {
                     description = e.unescape().unwrap_or_default().to_string();
+                    package_description_read = true;
+                    #[cfg(debug_assertions)]
+                    println!("  ✓ 读取到 package description: {}", description);
                 }
             }
             Ok(Event::End(ref e)) => match e.name().as_ref() {
@@ -137,9 +145,21 @@ pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
                 Ok(Event::Text(e)) => {
                     let text = e.unescape().unwrap_or_default().to_string();
                     match current_tag.as_str() {
-                        "name" if name.is_empty() => name = text,
-                        "vendor" if vendor.is_empty() => vendor = text,
-                        "version" if version.is_empty() => version = text,
+                        "name" if name.is_empty() => {
+                            name = text.clone();
+                            #[cfg(debug_assertions)]
+                            println!("  ✓ 读取到 name (文本): {}", text);
+                        }
+                        "vendor" if vendor.is_empty() => {
+                            vendor = text.clone();
+                            #[cfg(debug_assertions)]
+                            println!("  ✓ 读取到 vendor (文本): {}", text);
+                        }
+                        "version" if version.is_empty() => {
+                            version = text.clone();
+                            #[cfg(debug_assertions)]
+                            println!("  ✓ 读取到 version (文本): {}", text);
+                        }
                         _ => {}
                     }
                 }
@@ -154,7 +174,7 @@ pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
         }
     }
 
-    Ok(PackInfo {
+    let pack_info = PackInfo {
         name: if name.is_empty() {
             "Unknown".to_string()
         } else {
@@ -170,7 +190,31 @@ pub fn parse_pdsc(content: &str) -> AppResult<PackInfo> {
         } else {
             version
         },
-        description,
+        description: description.clone(),
         device_count,
-    })
+    };
+
+    // 打印解析结果到终端（开发模式）
+    #[cfg(debug_assertions)]
+    {
+        println!("\n========================================");
+        println!("📦 PDSC 解析结果:");
+        println!("========================================");
+        println!("  名称:     {}", pack_info.name);
+        println!("  厂商:     {}", pack_info.vendor);
+        println!("  版本:     {}", pack_info.version);
+        println!("  设备数:   {}", pack_info.device_count);
+        println!("  描述:     {}", if description.is_empty() { "(空)" } else { &description });
+        println!("========================================\n");
+    }
+
+    // 同时使用 log（用于日志文件）
+    log::info!("📦 解析 PDSC 文件成功:");
+    log::info!("  ├─ 名称: {}", pack_info.name);
+    log::info!("  ├─ 厂商: {}", pack_info.vendor);
+    log::info!("  ├─ 版本: {}", pack_info.version);
+    log::info!("  ├─ 设备数: {}", pack_info.device_count);
+    log::info!("  └─ 描述: {}", if description.is_empty() { "(空)" } else { &description });
+
+    Ok(pack_info)
 }

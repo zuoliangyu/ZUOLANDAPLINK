@@ -98,7 +98,7 @@ export function Header() {
     const file = await open({
       multiple: false,
       filters: [
-        { name: "固件文件", extensions: ["bin", "hex", "elf"] },
+        { name: "固件文件", extensions: ["hex", "bin", "elf", "axf", "out", "ihex"] },
         { name: "所有文件", extensions: ["*"] },
       ],
     });

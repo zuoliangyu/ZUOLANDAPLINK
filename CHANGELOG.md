@@ -5,6 +5,32 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.2] - 2026-01-24
+
+### 新增功能
+- ✨ **AXF/OUT 固件格式支持** - 烧录支持 ARM AXF 和 OUT 格式的 ELF 文件
+- ✨ **IHEX 格式支持** - 文件选择器支持 .ihex 扩展名
+
+### 修复
+- 🐛 **修复 Flash 算法扇区地址错误** - probe-rs 要求扇区地址使用相对偏移（从 0 开始），修复了使用绝对地址导致的 `assertion failed: props.sectors[0].address == 0` 错误
+- 🐛 **修复 Flash 算法加载地址错误** - 为 load_address 预留 0x20 字节的 header 空间，修复 `InvalidFlashAlgorithmLoadAddress` 错误
+- 🐛 **修复 RAM 地址选择逻辑** - PDSC 解析时优先选择 default="1" 的 RAM 区域或主 SRAM（0x20000000）
+
+### 改进
+- 🎨 **优化 FLM 文件匹配** - 根据 Flash 大小智能匹配对应的 FLM 算法文件
+- 🎨 **算法命名去重** - 算法名称包含 Flash 大小后缀，避免不同设备共享错误配置
+- 🎨 **增强错误日志** - 烧录失败时输出详细错误信息便于调试
+
+### 代码清理
+- 🗑️ 删除未使用的 `generate_probe_rs_yaml` 函数
+- 🗑️ 删除临时测试文件（.pdb, nul）
+- 🗑️ 更新 .gitignore 排除调试文件
+
+### 技术细节
+- 扇区地址使用相对偏移：`address: addr` 替代 `address: flash_start + addr`
+- load_address 预留 header：`collected.load_address + 0x20`
+- 支持固件格式：ELF, HEX, BIN, AXF, OUT, IHEX
+
 ## [0.4.1] - 2026-01-24
 
 ### 新增功能
@@ -377,6 +403,8 @@ SEGGER_RTT_printf(0, "%.1f,%.1f,%.1f\n", temp, humi, press);
 
 ---
 
+[0.4.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.1...v0.3.2

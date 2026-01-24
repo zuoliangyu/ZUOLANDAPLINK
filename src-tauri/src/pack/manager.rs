@@ -1,5 +1,4 @@
 use crate::error::{AppError, AppResult};
-use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,10 +19,15 @@ pub struct PackManager {
 
 impl PackManager {
     pub fn new() -> AppResult<Self> {
-        let packs_dir = if let Some(proj_dirs) = ProjectDirs::from("com", "zuolan", "daplink") {
-            proj_dirs.data_dir().join("packs")
+        // 使用可执行文件同级的 data/packs 目录
+        let packs_dir = if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                exe_dir.join("data").join("packs")
+            } else {
+                PathBuf::from("./data/packs")
+            }
         } else {
-            PathBuf::from("./packs")
+            PathBuf::from("./data/packs")
         };
 
         // 确保目录存在
@@ -33,6 +37,8 @@ impl PackManager {
     }
 
     pub fn import_pack(&self, pack_path: &Path) -> AppResult<PackInfo> {
+        log::info!("🔄 开始导入 Pack: {:?}", pack_path);
+
         let file = fs::File::open(pack_path)?;
         let mut archive = ZipArchive::new(file)
             .map_err(|e| AppError::PackError(format!("无法打开Pack文件: {}", e)))?;
@@ -46,6 +52,7 @@ impl PackManager {
                 .map_err(|e| AppError::PackError(e.to_string()))?;
 
             if file.name().ends_with(".pdsc") {
+                log::info!("📄 找到 PDSC 文件: {}", file.name());
                 std::io::Read::read_to_string(&mut file, &mut pdsc_content)?;
                 break;
             }
@@ -56,13 +63,16 @@ impl PackManager {
         }
 
         // 解析.pdsc获取基本信息
+        log::info!("🔍 开始解析 PDSC 文件...");
         let pack_info = super::parser::parse_pdsc(&pdsc_content)?;
 
         // 创建Pack目录
         let pack_dir = self.packs_dir.join(&pack_info.name);
+        log::info!("📁 创建 Pack 目录: {:?}", pack_dir);
         fs::create_dir_all(&pack_dir)?;
 
         // 解压Pack
+        log::info!("📦 开始解压 Pack 文件...");
         let file = fs::File::open(pack_path)?;
         let mut archive = ZipArchive::new(file)
             .map_err(|e| AppError::PackError(format!("无法打开Pack文件: {}", e)))?;
@@ -87,13 +97,16 @@ impl PackManager {
             }
         }
 
+        log::info!("✅ Pack 导入成功!");
         Ok(pack_info)
     }
 
     pub fn list_packs(&self) -> AppResult<Vec<PackInfo>> {
+        log::info!("📋 开始列出已导入的 Pack...");
         let mut packs = Vec::new();
 
         if !self.packs_dir.exists() {
+            log::warn!("⚠️  Pack 目录不存在: {:?}", self.packs_dir);
             return Ok(packs);
         }
 
@@ -102,12 +115,14 @@ impl PackManager {
             let path = entry.path();
 
             if path.is_dir() {
+                log::debug!("🔍 扫描目录: {:?}", path);
                 // 查找.pdsc文件
                 for pdsc_entry in fs::read_dir(&path)? {
                     let pdsc_entry = pdsc_entry?;
                     let pdsc_path = pdsc_entry.path();
 
                     if pdsc_path.extension().map_or(false, |ext| ext == "pdsc") {
+                        log::info!("📄 找到 PDSC 文件: {:?}", pdsc_path);
                         let content = fs::read_to_string(&pdsc_path)?;
                         if let Ok(info) = super::parser::parse_pdsc(&content) {
                             packs.push(info);
@@ -118,6 +133,7 @@ impl PackManager {
             }
         }
 
+        log::info!("✅ 共找到 {} 个 Pack", packs.len());
         Ok(packs)
     }
 

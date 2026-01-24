@@ -33,3 +33,7 @@ packs/*.pack
 # Claude Code
 .claude/
 .spec-workflow/
+
+# Debug files
+*.pdb
+nul

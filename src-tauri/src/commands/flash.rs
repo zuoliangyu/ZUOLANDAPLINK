@@ -97,12 +97,18 @@ pub async fn flash_firmware(
     }
 
     // 根据文件扩展名确定格式
-    let format = match path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
-        Some("hex") | Some("ihex") => Format::Hex,
+    // 支持的格式: ELF, HEX, BIN, AXF (ARM ELF), OUT
+    let ext = path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase());
+    let format = match ext.as_deref() {
+        // Intel HEX 格式
+        Some("hex") | Some("ihex") => {
+            log::info!("检测到 HEX 格式固件");
+            Format::Hex
+        }
+        // 纯二进制格式 - 需要指定基地址
         Some("bin") => {
-            // BIN文件需要指定基地址
+            log::info!("检测到 BIN 格式固件");
             let base_address = if options.use_custom_address.unwrap_or(false) {
-                // 使用自定义地址
                 options.custom_flash_address.unwrap_or(0x08000000)
             } else {
                 // 自动从目标内存映射获取Flash起始地址
@@ -114,11 +120,21 @@ pub async fn flash_firmware(
                             None
                         }
                     })
-                    .unwrap_or(0x08000000) // 默认STM32 Flash地址
+                    .unwrap_or(0x08000000)
             };
+            log::info!("BIN 基地址: 0x{:08X}", base_address);
             Format::Bin(BinOptions { base_address: Some(base_address), skip: 0 })
         }
-        _ => Format::Elf, // 默认尝试ELF格式
+        // ELF 格式 (包括 AXF - ARM eXecutable Format)
+        Some("elf") | Some("axf") | Some("out") => {
+            log::info!("检测到 ELF 格式固件 (扩展名: {})", ext.as_deref().unwrap_or("unknown"));
+            Format::Elf
+        }
+        // 未知扩展名 - 尝试作为 ELF 解析
+        _ => {
+            log::info!("未知扩展名 {:?}，尝试作为 ELF 格式解析", ext);
+            Format::Elf
+        }
     };
 
     // 根据擦除模式配置下载选项
@@ -211,7 +227,15 @@ pub async fn flash_firmware(
 
     // 执行下载
     download_file_with_options(session, path, format, download_options)
-        .map_err(|e| AppError::FlashError(e.to_string()))?;
+        .map_err(|e| {
+            // 输出详细的错误信息用于调试
+            log::error!("Flash 错误详情: {:?}", e);
+            log::error!("Flash 错误类型: {}", std::any::type_name_of_val(&e));
+
+            // 构建更详细的错误消息
+            let error_msg = format!("{:#}", e);
+            AppError::FlashError(error_msg)
+        })?;
 
     // 重置芯片
     if options.reset_after {
