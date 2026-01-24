@@ -5,6 +5,58 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-01-24
+
+### 重大变更
+- 🚀 **模式切换架构重构** - 从混合布局重构为"烧录模式"和"RTT模式"独立界面
+  - 烧录模式：专注于固件烧录、擦除、校验等操作
+  - RTT模式：专注于实时调试输出和数据可视化
+  - 共用左侧边栏配置（探针、芯片、接口设置）
+
+### 新增功能
+- ✨ **键盘快捷键** - 支持 `Ctrl+1` 切换到烧录模式，`Ctrl+2` 切换到 RTT 模式
+- ✨ **模式切换动画** - 平滑的淡入淡出过渡效果（200ms）
+- ✨ **固件拖放导入** - 支持直接拖放 .hex/.bin/.elf/.axf/.out/.ihex 文件到烧录界面
+- ✨ **Pack批量拖放导入** - 支持批量拖放多个 .pack 文件到 Pack 管理器
+- ✨ **Pack管理折叠** - CMSIS-Pack 管理卡片支持折叠，节省侧边栏空间
+- ✨ **RTT系统日志** - RTT 模式添加系统日志面板，显示连接错误等信息
+
+### UI改进
+- 🎨 **新增 TopBar** - 顶部状态栏显示：当前芯片、固件文件名、RTT数据量、连接状态
+- 🎨 **新增 ModeSwitch** - 模式切换组件，显示快捷键提示
+- 🎨 **连接按钮优化** - 改进连接/断开按钮的视觉反馈（绿色连接、红色断开）
+- 🎨 **RTT工具栏优化** - 启动按钮绿色、断开按钮红色边框，视觉更清晰
+- 🎨 **模式状态持久化** - 记住用户上次选择的模式
+
+### 技术改进
+- 🏗️ 新增 `appStore.ts` - 管理应用模式状态
+- 🏗️ 新增 `modes/` 目录 - 包含 FlashMode 和 RttMode 组件
+- 🏗️ 新增 `TopBar.tsx` - 替代旧的 Header 组件
+- 🏗️ 新增 `ModeSwitch.tsx` - 模式切换 Toggle Group
+- 🏗️ 使用 Tauri 2.0 `onDragDropEvent` API 实现拖放功能
+- 🏗️ RttPanel 添加 className prop 支持样式自定义
+
+### 删除
+- 🗑️ 删除 `Header.tsx` - 拆分为 TopBar 和 FlashToolbar
+- 🗑️ 删除 `MainArea.tsx` - 拆分为 FlashMode 组件
+
+### 架构说明
+```
+新布局结构：
+┌─────────────────────────────────────────────────────────────┐
+│ TopBar: [Logo]  [🔥烧录] [📟RTT]  [芯片信息] [连接状态]     │
+├─────────────┬───────────────────────────────────────────────┤
+│  Sidebar    │ 烧录模式:                                     │
+│  (共用配置) │ ┌─────────────────────────────────────────────┐│
+│             │ │ FlashToolbar + FlashContent + LogPanel      ││
+│  - 探针选择 │ └─────────────────────────────────────────────┘│
+│  - 芯片选择 │ RTT模式:                                       │
+│  - 接口设置 │ ┌─────────────────────────────────────────────┐│
+│  - Pack管理 │ │ RttPanel + LogPanel                         ││
+│             │ └─────────────────────────────────────────────┘│
+└─────────────┴───────────────────────────────────────────────┘
+```
+
 ## [0.4.2] - 2026-01-24
 
 ### 新增功能
@@ -403,6 +455,7 @@ SEGGER_RTT_printf(0, "%.1f,%.1f,%.1f\n", temp, humi, press);
 
 ---
 
+[0.5.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.3.3...v0.4.0

@@ -20,6 +20,7 @@ import { useChipStore } from "@/stores/chipStore";
 import { useLogStore } from "@/stores/logStore";
 import { listProbes, connectTarget, disconnect, searchChips, getChipInfo, getConnectionStatus } from "@/lib/tauri";
 import { PackManager } from "@/components/config/PackManager";
+import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const {
@@ -409,11 +410,22 @@ export function Sidebar() {
 
       {/* 连接按钮 */}
       <Button
-        className="w-full"
+        className={cn(
+          "w-full transition-all",
+          connected
+            ? "bg-red-500 hover:bg-red-600 text-white"
+            : "bg-primary hover:bg-primary/90",
+          loading && "animate-pulse"
+        )}
         onClick={connected ? handleDisconnect : handleConnect}
         disabled={loading || (!connected && (!selectedProbe || !selectedChip))}
       >
-        {connected ? (
+        {loading ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            {connected ? "断开中..." : "连接中..."}
+          </>
+        ) : connected ? (
           <>
             <Unplug className="h-4 w-4 mr-2" />
             断开连接

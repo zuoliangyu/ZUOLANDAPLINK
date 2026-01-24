@@ -1,0 +1,130 @@
+import { Zap, Terminal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAppStore, type AppMode } from "@/stores/appStore";
+import { useRttStore } from "@/stores/rttStore";
+import { useFlashStore } from "@/stores/flashStore";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface ModeSwitchProps {
+  className?: string;
+}
+
+export function ModeSwitch({ className }: ModeSwitchProps) {
+  const { mode, setMode } = useAppStore();
+  const { isRunning: rttRunning } = useRttStore();
+  const { flashing } = useFlashStore();
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; targetMode: AppMode | null }>({
+    open: false,
+    targetMode: null,
+  });
+
+  const handleModeChange = (newMode: AppMode) => {
+    if (newMode === mode) return;
+
+    // If RTT is running and switching to flash mode, show confirmation
+    if (rttRunning && newMode === "flash") {
+      setConfirmDialog({ open: true, targetMode: newMode });
+      return;
+    }
+
+    // If flashing is in progress, don't allow switching
+    if (flashing) {
+      return;
+    }
+
+    setMode(newMode);
+  };
+
+  const handleConfirmSwitch = () => {
+    if (confirmDialog.targetMode) {
+      setMode(confirmDialog.targetMode);
+    }
+    setConfirmDialog({ open: false, targetMode: null });
+  };
+
+  return (
+    <>
+      <div className={cn("flex items-center gap-1 bg-muted/50 rounded-lg p-1", className)}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={mode === "flash" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleModeChange("flash")}
+                disabled={flashing}
+                className={cn(
+                  "gap-1.5 h-7 px-3",
+                  mode === "flash" && "bg-primary text-primary-foreground"
+                )}
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">烧录</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>烧录模式 - 固件烧录、擦除、校验 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+1</kbd></p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={mode === "rtt" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleModeChange("rtt")}
+                disabled={flashing}
+                className={cn(
+                  "gap-1.5 h-7 px-3",
+                  mode === "rtt" && "bg-primary text-primary-foreground"
+                )}
+              >
+                <Terminal className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">RTT</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>RTT 模式 - 实时数据传输和调试 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+2</kbd></p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Confirmation dialog when RTT is running */}
+      <Dialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && setConfirmDialog({ open: false, targetMode: null })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认切换模式</DialogTitle>
+            <DialogDescription>
+              RTT 正在运行中。切换到烧录模式将停止 RTT 数据接收。确定要继续吗？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog({ open: false, targetMode: null })}
+            >
+              取消
+            </Button>
+            <Button onClick={handleConfirmSwitch}>确认切换</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

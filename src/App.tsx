@@ -1,11 +1,12 @@
-import { Header } from "./components/layout/Header";
 import { Sidebar } from "./components/layout/Sidebar";
-import { MainArea } from "./components/layout/MainArea";
-import { LogPanel } from "./components/log/LogPanel";
-import { useEffect } from "react";
+import { TopBar } from "./components/layout/TopBar";
+import { FlashMode, RttMode } from "./components/modes";
+import { useEffect, useCallback } from "react";
 import { useLogStore } from "./stores/logStore";
 import { useProbeStore } from "./stores/probeStore";
 import { useRttStore } from "./stores/rttStore";
+import { useAppStore } from "./stores/appStore";
+import { useFlashStore } from "./stores/flashStore";
 import { useUserActivity } from "./hooks/useUserActivity";
 import { disconnect, initPacks } from "./lib/tauri";
 
@@ -13,13 +14,15 @@ function App() {
   const addLog = useLogStore((state) => state.addLog);
   const { connected, autoDisconnect, autoDisconnectTimeout, setConnected } = useProbeStore();
   const { isRunning: rttRunning } = useRttStore();
+  const { flashing } = useFlashStore();
+  const { mode, setMode } = useAppStore();
   const { isActive, timeRemainingSeconds } = useUserActivity(autoDisconnectTimeout);
 
   useEffect(() => {
     addLog("info", "ZUOLAN DAPLINK RTTVIEW工具已启动");
     addLog("info", "等待连接调试探针...");
 
-    // 初始化：加载已导入的 Pack
+    // Initialize: load imported Packs
     initPacks()
       .then((count) => {
         if (count > 0) {
@@ -31,14 +34,43 @@ function App() {
       });
   }, [addLog]);
 
-  // 自动断开逻辑
+  // Keyboard shortcuts: Ctrl+1 for Flash mode, Ctrl+2 for RTT mode
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Don't trigger if typing in an input
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Ctrl+1: Switch to Flash mode
+    if (e.ctrlKey && e.key === "1") {
+      e.preventDefault();
+      if (!flashing) {
+        setMode("flash");
+      }
+    }
+
+    // Ctrl+2: Switch to RTT mode
+    if (e.ctrlKey && e.key === "2") {
+      e.preventDefault();
+      if (!flashing) {
+        setMode("rtt");
+      }
+    }
+  }, [flashing, setMode]);
+
   useEffect(() => {
-    // 如果未启用自动断开，或未连接，或RTT正在运行，则不执行自动断开
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Auto-disconnect logic
+  useEffect(() => {
+    // If auto-disconnect is disabled, not connected, or RTT is running, don't auto-disconnect
     if (!autoDisconnect || !connected || rttRunning) {
       return;
     }
 
-    // 如果用户不活跃，执行自动断开
+    // If user is inactive, perform auto-disconnect
     if (!isActive) {
       handleAutoDisconnect();
     }
@@ -54,7 +86,7 @@ function App() {
     }
   };
 
-  // 显示倒计时提示（最后5秒）
+  // Show countdown hint (last 5 seconds)
   useEffect(() => {
     if (
       autoDisconnect &&
@@ -63,19 +95,34 @@ function App() {
       timeRemainingSeconds > 0 &&
       timeRemainingSeconds <= 5
     ) {
-      // 可以在这里添加倒计时提示UI
-      // 例如：显示一个toast或者在Header中显示倒计时
+      // Can add countdown UI hint here
+      // e.g.: show a toast or display countdown in TopBar
     }
   }, [autoDisconnect, connected, rttRunning, timeRemainingSeconds]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <Header />
+      <TopBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <MainArea />
+        {/* Mode content with transition animation */}
+        <div className="flex-1 overflow-hidden relative">
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              mode === "flash" ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+            }`}
+          >
+            <FlashMode />
+          </div>
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              mode === "rtt" ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+            }`}
+          >
+            <RttMode />
+          </div>
+        </div>
       </div>
-      <LogPanel />
     </div>
   );
 }

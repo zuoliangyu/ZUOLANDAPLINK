@@ -1,20 +1,21 @@
 import { useRttStore } from "@/stores/rttStore";
-import { useRttEvents } from "@/hooks/useRttEvents";
 import { RttToolbar } from "./RttToolbar";
 import { RttViewer } from "./RttViewer";
 import { RttStatusBar } from "./RttStatusBar";
 import { RttChartViewer } from "./RttChartViewer";
 import { Panel, Group, Separator } from "react-resizable-panels";
+import { cn } from "@/lib/utils";
 
-export function RttPanel() {
+interface RttPanelProps {
+  className?: string;
+}
+
+export function RttPanel({ className }: RttPanelProps) {
   const { error, viewMode, splitRatio, setSplitRatio } = useRttStore();
 
-  // 监听 RTT 事件
-  useRttEvents();
-
-  // 移除主连接检查，RTT 现在是独立的
+  // RTT is now independent from main connection
   return (
-    <div className="flex flex-col h-full">
+    <div className={cn("flex flex-col h-full", className)}>
       {/* 工具栏 */}
       <RttToolbar />
 

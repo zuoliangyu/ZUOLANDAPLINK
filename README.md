@@ -1,8 +1,8 @@
 # ZUOLAN DAPLINK RTTVIEW
 
-一个开源的第三方DAPLINK烧录软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
+一个开源的第三方DAPLINKhe RTTview实现软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.4.2-blue)
+![Version](https://img.shields.io/badge/version-0.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性
@@ -78,11 +78,15 @@
 ZUOLANDAPLINK/
 ├── src/                          # React 前端源码
 │   ├── components/               # UI组件
-│   │   ├── layout/              # 布局组件 (Header, Sidebar, MainArea)
+│   │   ├── layout/              # 布局组件 (TopBar, Sidebar, ModeSwitch)
+│   │   ├── modes/               # 模式组件 (FlashMode, RttMode)
+│   │   ├── flash/               # 烧录相关组件
 │   │   ├── rtt/                 # RTT 终端组件
 │   │   ├── log/                 # 日志面板
+│   │   ├── config/              # 配置组件 (PackManager)
 │   │   └── ui/                  # 基础UI组件 (shadcn/ui)
 │   ├── stores/                  # Zustand 状态管理
+│   │   ├── appStore.ts          # 应用模式状态
 │   │   ├── probeStore.ts        # 探针状态
 │   │   ├── chipStore.ts         # 芯片状态
 │   │   ├── flashStore.ts        # 烧录状态
@@ -120,7 +124,9 @@ ZUOLANDAPLINK/
 │   ├── SEGGER_RTT_Conf.h
 │   └── SEGGER_RTT_printf.c
 ├── docs/                        # 文档
-│   └── RTT_USER_MANUAL.md       # RTT 用户手册
+│   ├── RTT_USER_MANUAL.md       # RTT 用户手册
+│   ├── RTT_CHART_GUIDE.md       # RTT 图表功能指南
+│   └── RTT_XY_SCATTER_GUIDE.md  # XY 散点图指南
 ├── packs/                       # 用户导入的Pack存放目录
 ├── package.json                 # Node.js依赖
 └── README.md                    # 本文件
@@ -278,19 +284,21 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 
 查看完整的更新日志请访问 [CHANGELOG.md](CHANGELOG.md)
 
-### 最新版本 v0.3.2 (2026-01-23)
+### 最新版本 v0.5.0 (2026-01-24)
 
-- 🎨 实现真实的Flash烧录进度跟踪，显示准确的进度百分比和字节数
-- 🎨 优化进度计算逻辑，擦除阶段0-30%，编程阶段30-95%
-- 🐛 修复未使用的导入警告
+- 🚀 **模式切换架构** - 全新的"烧录模式"和"RTT模式"切换，各自拥有独立、专注的界面
+- ✨ **键盘快捷键** - 支持 Ctrl+1/2 快速切换模式
+- ✨ **模式切换动画** - 平滑的淡入淡出过渡效果
+- ✨ **固件拖放导入** - 支持直接拖放固件文件到烧录界面
+- ✨ **Pack批量导入** - 支持批量拖放多个 .pack 文件导入
+- ✨ **Pack管理折叠** - CMSIS-Pack 管理卡片支持折叠
+- 🎨 **状态栏增强** - 显示当前芯片、固件文件、RTT数据量等信息
+- 🎨 **RTT工具栏优化** - 改进按钮样式和视觉反馈
 
-### v0.3.1 (2026-01-23)
+### v0.4.2 (2026-01-24)
 
-- 🐛 修复Flash进度条显示错误（之前显示5500%）
-- 🐛 修复日志面板拖动方向
-- ✨ 高级擦除对话框（全片擦除/自定义范围擦除）
-- ✨ 新增GD32F470系列支持（6个型号）
-- 🎨 优化工具栏布局，添加"烧录模式"标签
+- ✨ 支持 AXF/OUT/IHEX 固件格式
+- 🐛 修复 Flash 算法扇区地址和加载地址错误
 
 [查看完整更新日志 →](CHANGELOG.md)
 

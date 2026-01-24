@@ -249,12 +249,12 @@ export function RttToolbar() {
       {!rttConnected ? (
         <Button
           size="sm"
-          variant="outline"
+          variant="default"
           onClick={handleRttConnect}
           disabled={rttConnecting}
           className="gap-1"
         >
-          <Link className="h-3.5 w-3.5" />
+          <Link className={`h-3.5 w-3.5 ${rttConnecting ? "animate-pulse" : ""}`} />
           {rttConnecting ? "连接中..." : "连接 RTT"}
         </Button>
       ) : (
@@ -262,7 +262,7 @@ export function RttToolbar() {
           size="sm"
           variant="outline"
           onClick={handleRttDisconnect}
-          className="gap-1"
+          className="gap-1 border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-500"
         >
           <Unlink className="h-3.5 w-3.5" />
           断开 RTT
@@ -273,12 +273,22 @@ export function RttToolbar() {
 
       {/* 启动/停止按钮 */}
       {!isRunning ? (
-        <Button size="sm" onClick={handleStart} disabled={!rttConnected} className="gap-1">
+        <Button
+          size="sm"
+          onClick={handleStart}
+          disabled={!rttConnected}
+          className="gap-1 bg-green-600 hover:bg-green-700 text-white"
+        >
           <Play className="h-3.5 w-3.5" />
           启动
         </Button>
       ) : (
-        <Button size="sm" variant="destructive" onClick={handleStop} className="gap-1">
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={handleStop}
+          className="gap-1"
+        >
           <Square className="h-3.5 w-3.5" />
           停止
         </Button>
