@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.2] - 2026-01-24
+
+### 改进
+- 🔧 **自动更新优化** - 启用 Tauri updater JSON 自动生成
+  - GitHub Actions 自动生成 latest.json 文件
+  - 确保应用自动更新功能正常工作
+  - 优化更新检测和下载流程
+
 ## [0.5.1] - 2026-01-24
 
 ### 新增功能
