@@ -2,7 +2,7 @@
 
 一个开源的第三方DAPLINKhe RTTview实现软件，基于Tauri + React + Rust技术栈开发，使用probe-rs作为底层调试库。
 
-![Version](https://img.shields.io/badge/version-0.5.6-blue)
+![Version](https://img.shields.io/badge/version-0.6.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ 功能特性
@@ -27,6 +27,15 @@
 - **高速传输** - 比传统UART打印快数倍
 - **智能功能** - 自动滚动、关键字搜索、日志级别识别
 - **数据导出** - 支持导出为TXT和CSV格式
+
+### 串口终端功能
+- **多数据源支持** - 支持本地串口（COM口）和TCP远程串口（ser2net、ESP-Link等）
+- **完整串口参数** - 支持配置波特率、数据位、停止位、校验位、流控制
+- **收发分屏** - 支持左右分屏显示接收(RX)和发送(TX)数据
+- **发送功能** - 支持文本和HEX两种发送模式，支持发送历史记录
+- **复用RTT能力** - 复用RTT的颜色解析、图表绘制功能
+- **显示模式** - 支持文本/HEX显示模式切换，可显示/隐藏时间戳
+- **数据导出** - 支持导出串口日志为TXT格式
 
 ### 智能管理
 - **自动断开** - 可配置无操作自动断开连接（5-300秒可选），RTT运行时自动禁用
@@ -79,9 +88,10 @@ ZUOLANDAPLINK/
 ├── src/                          # React 前端源码
 │   ├── components/               # UI组件
 │   │   ├── layout/              # 布局组件 (TopBar, Sidebar, ModeSwitch)
-│   │   ├── modes/               # 模式组件 (FlashMode, RttMode)
+│   │   ├── modes/               # 模式组件 (FlashMode, RttMode, SerialMode)
 │   │   ├── flash/               # 烧录相关组件
 │   │   ├── rtt/                 # RTT 终端组件
+│   │   ├── serial/              # 串口终端组件
 │   │   ├── log/                 # 日志面板
 │   │   ├── config/              # 配置组件 (PackManager)
 │   │   └── ui/                  # 基础UI组件 (shadcn/ui)
@@ -91,13 +101,16 @@ ZUOLANDAPLINK/
 │   │   ├── chipStore.ts         # 芯片状态
 │   │   ├── flashStore.ts        # 烧录状态
 │   │   ├── rttStore.ts          # RTT状态
+│   │   ├── serialStore.ts       # 串口状态
 │   │   └── logStore.ts          # 日志状态
 │   ├── hooks/                   # React Hooks
 │   │   ├── useRttEvents.ts      # RTT事件监听
+│   │   ├── useSerialEvents.ts   # 串口事件监听
 │   │   └── useUserActivity.ts   # 用户活动检测
 │   ├── lib/                     # 工具库和类型定义
 │   │   ├── tauri.ts             # Tauri API封装
 │   │   ├── types.ts             # TypeScript类型定义
+│   │   ├── serialTypes.ts       # 串口类型定义
 │   │   └── utils.ts             # 工具函数
 │   ├── App.tsx                  # 主应用组件
 │   └── main.tsx                 # 入口文件
@@ -108,7 +121,12 @@ ZUOLANDAPLINK/
 │   │   │   ├── flash.rs         # 烧录操作（烧录、擦除、校验）
 │   │   │   ├── memory.rs        # 内存操作（读写、寄存器）
 │   │   │   ├── rtt.rs           # RTT调试（启动、停止、数据传输）
+│   │   │   ├── serial.rs        # 串口操作（连接、读写、配置）
 │   │   │   └── config.rs        # 芯片配置（搜索、信息查询）
+│   │   ├── serial/              # 串口模块
+│   │   │   ├── mod.rs           # 模块入口
+│   │   │   ├── local.rs         # 本地串口实现
+│   │   │   └── tcp.rs           # TCP串口实现
 │   │   ├── pack/                # CMSIS-Pack 处理
 │   │   │   ├── manager.rs       # Pack管理器
 │   │   │   └── parser.rs        # PDSC解析器
@@ -284,16 +302,13 @@ RTT 功能需要目标固件集成 SEGGER RTT 库。本项目已在 `RTTBSP/` �
 
 查看完整的更新日志请访问 [CHANGELOG.md](CHANGELOG.md)
 
-### 最新版本 v0.5.0 (2026-01-24)
+### 最新版本 v0.6.0 (2026-01-25)
 
-- 🚀 **模式切换架构** - 全新的"烧录模式"和"RTT模式"切换，各自拥有独立、专注的界面
-- ✨ **键盘快捷键** - 支持 Ctrl+1/2 快速切换模式
-- ✨ **模式切换动画** - 平滑的淡入淡出过渡效果
-- ✨ **固件拖放导入** - 支持直接拖放固件文件到烧录界面
-- ✨ **Pack批量导入** - 支持批量拖放多个 .pack 文件导入
-- ✨ **Pack管理折叠** - CMSIS-Pack 管理卡片支持折叠
-- 🎨 **状态栏增强** - 显示当前芯片、固件文件、RTT数据量等信息
-- 🎨 **RTT工具栏优化** - 改进按钮样式和视觉反馈
+- 🚀 **串口终端模式** - 新增第三种工作模式，支持本地串口和TCP远程串口
+- ✨ **多数据源架构** - DataSource 抽象层，支持本地 COM 口和 TCP 串口服务器
+- ✨ **收发分屏显示** - 左右分屏显示 RX 和 TX 数据，可与图表同时使用
+- ✨ **发送历史记录** - 支持发送历史，HEX 发送模式
+- ✨ **复用 RTT 能力** - 复用颜色解析、图表绘制、智能配置等功能
 
 ### v0.4.2 (2026-01-24)
 

@@ -1,6 +1,7 @@
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
-import { FlashMode, RttMode } from "./components/modes";
+import { FlashMode, RttMode, SerialMode } from "./components/modes";
+import { SerialSidebar } from "./components/serial";
 import { useEffect, useCallback } from "react";
 import { useLogStore } from "./stores/logStore";
 import { useProbeStore } from "./stores/probeStore";
@@ -34,7 +35,7 @@ function App() {
       });
   }, [addLog]);
 
-  // Keyboard shortcuts: Ctrl+1 for Flash mode, Ctrl+2 for RTT mode
+  // Keyboard shortcuts: Ctrl+1 for Flash mode, Ctrl+2 for RTT mode, Ctrl+3 for Serial mode
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Don't trigger if typing in an input
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -54,6 +55,14 @@ function App() {
       e.preventDefault();
       if (!flashing) {
         setMode("rtt");
+      }
+    }
+
+    // Ctrl+3: Switch to Serial mode
+    if (e.ctrlKey && e.key === "3") {
+      e.preventDefault();
+      if (!flashing) {
+        setMode("serial");
       }
     }
   }, [flashing, setMode]);
@@ -104,7 +113,9 @@ function App() {
     <div className="flex flex-col h-screen bg-background">
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
+        {/* Sidebar: switch based on mode */}
+        {mode === "serial" ? <SerialSidebar /> : <Sidebar />}
+
         {/* Mode content with transition animation */}
         <div className="flex-1 overflow-hidden relative">
           <div
@@ -120,6 +131,13 @@ function App() {
             }`}
           >
             <RttMode />
+          </div>
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              mode === "serial" ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+            }`}
+          >
+            <SerialMode />
           </div>
         </div>
       </div>

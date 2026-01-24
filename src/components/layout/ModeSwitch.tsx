@@ -1,4 +1,4 @@
-import { Zap, Terminal } from "lucide-react";
+import { Zap, Terminal, Plug2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip-button";
 import { useAppStore, type AppMode } from "@/stores/appStore";
@@ -84,6 +84,22 @@ export function ModeSwitch({ className }: ModeSwitchProps) {
           >
             <Terminal className="h-3.5 w-3.5" />
             <span className="text-xs font-medium">RTT</span>
+          </Button>
+        </TooltipWrapper>
+
+        <TooltipWrapper tooltip={<p>串口模式 - 串口终端通信 <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-muted rounded">Ctrl+3</kbd></p>}>
+          <Button
+            variant={mode === "serial" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => handleModeChange("serial")}
+            disabled={flashing}
+            className={cn(
+              "gap-1.5 h-7 px-3",
+              mode === "serial" && "bg-primary text-primary-foreground"
+            )}
+          >
+            <Plug2 className="h-3.5 w-3.5" />
+            <span className="text-xs font-medium">串口</span>
           </Button>
         </TooltipWrapper>
       </div>

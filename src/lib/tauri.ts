@@ -161,3 +161,50 @@ export async function saveProjectConfig(config: ProjectConfig, filePath: string)
 export async function loadProjectConfig(filePath: string): Promise<ProjectConfig> {
   return await invoke<ProjectConfig>("load_project_config", { filePath });
 }
+
+// 串口命令
+import type {
+  SerialPortInfo,
+  SerialConfig,
+  SerialStatus,
+} from "./serialTypes";
+
+export async function listSerialPorts(): Promise<SerialPortInfo[]> {
+  return await invoke<SerialPortInfo[]>("list_serial_ports_cmd");
+}
+
+export async function connectSerial(config: SerialConfig): Promise<void> {
+  return await invoke("connect_serial", { config });
+}
+
+export async function disconnectSerial(): Promise<void> {
+  return await invoke("disconnect_serial");
+}
+
+export async function writeSerial(data: number[]): Promise<number> {
+  return await invoke<number>("write_serial", { data });
+}
+
+export async function writeSerialString(
+  text: string,
+  encoding: string,
+  lineEnding: string
+): Promise<number> {
+  return await invoke<number>("write_serial_string", { text, encoding, lineEnding });
+}
+
+export async function startSerial(pollInterval?: number): Promise<void> {
+  return await invoke("start_serial", { pollInterval });
+}
+
+export async function stopSerial(): Promise<void> {
+  return await invoke("stop_serial");
+}
+
+export async function getSerialStatus(): Promise<SerialStatus> {
+  return await invoke<SerialStatus>("get_serial_status");
+}
+
+export async function clearSerialBuffer(): Promise<void> {
+  return await invoke("clear_serial_buffer");
+}

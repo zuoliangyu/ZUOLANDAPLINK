@@ -5,6 +5,102 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-01-25
+
+### 重大新增
+- 🚀 **串口终端模式** - 新增第三种工作模式，与烧录模式、RTT模式并列
+- ✨ **多数据源架构** - DataSource 抽象层，支持未来扩展更多数据源类型
+
+### 新增功能
+
+**串口连接**：
+- ✨ **本地串口支持** - 支持本地 COM 口连接，使用 serialport crate 实现
+- ✨ **TCP 远程串口** - 支持 TCP 串口服务器（ser2net、ESP-Link 等）
+- ✨ **完整串口参数** - 波特率、数据位、停止位、校验位、流控制全面支持
+- ✨ **串口列表刷新** - 自动检测可用串口，支持手动刷新
+
+**终端显示**：
+- ✨ **收发分屏** - 左右分屏显示接收(RX)和发送(TX)数据
+- ✨ **分屏与图表兼容** - 收发分屏可以与图表视图同时使用
+- ✨ **时间戳显示** - 可开关的时间戳显示（精确到毫秒）
+- ✨ **文本/HEX 切换** - 支持文本和十六进制两种显示模式
+- ✨ **ANSI 颜色支持** - 复用 RTT 的颜色解析功能
+
+**发送功能**：
+- ✨ **文本发送** - 支持 UTF-8/GBK 编码，可选换行符
+- ✨ **HEX 发送** - 支持十六进制格式发送
+- ✨ **发送历史** - 最近 20 条发送历史，支持快速选择
+
+**复用能力**：
+- ✨ **图表可视化** - 复用 RTT 的图表绘制功能
+- ✨ **智能配置** - 复用 RTT 的数据格式检测和自动配置
+- ✨ **颜色标记** - 复用 RTT 的自定义颜色标记解析
+
+### UI 改进
+- 🎨 **串口专用侧边栏** - 串口模式下显示专用配置面板
+- 🎨 **模式切换扩展** - TopBar 添加串口模式切换按钮
+- 🎨 **快捷键支持** - Ctrl+3 快速切换到串口模式
+- 🎨 **统计信息** - 显示 RX/TX 字节数统计
+
+### 新增组件
+
+**后端 (Rust)**：
+- ✨ `serial/` 模块 - 串口数据源实现
+  - `mod.rs` - DataSource trait 定义
+  - `local.rs` - 本地串口实现 (173 行)
+  - `tcp.rs` - TCP 串口实现 (121 行)
+- ✨ `commands/serial.rs` - 串口 Tauri 命令 (283 行)
+
+**前端 (React)**：
+- ✨ `SerialMode.tsx` - 串口模式入口组件
+- ✨ `SerialPanel.tsx` - 串口主面板
+- ✨ `SerialSidebar.tsx` - 串口配置侧边栏
+- ✨ `SerialToolbar.tsx` - 串口工具栏
+- ✨ `SerialViewer.tsx` - 串口数据显示
+- ✨ `SerialSendBar.tsx` - 发送输入栏
+- ✨ `serialStore.ts` - 串口状态管理
+- ✨ `serialTypes.ts` - 串口类型定义
+- ✨ `useSerialEvents.ts` - 串口事件监听 Hook
+
+### 新增依赖
+- ✨ `serialport = "4.3"` - Rust 串口库
+
+### 架构说明
+```
+新布局结构：
+┌─────────────────────────────────────────────────────────────┐
+│ TopBar: [Logo]  [🔥烧录] [📟RTT] [🔌串口]  [状态信息]        │
+├─────────────┬───────────────────────────────────────────────┤
+│             │ 串口模式:                                      │
+│ Serial      │ ┌─────────────────────────────────────────────┐│
+│ Sidebar     │ │ SerialToolbar                               ││
+│             │ ├──────────────┬──────────────────────────────┤│
+│ - 数据源    │ │    RX 接收    │    TX 发送     │ (可选分屏) ││
+│ - 串口配置  │ ├──────────────┴──────────────────────────────┤│
+│ - TCP配置   │ │ RttChartViewer (图表，可选)                  ││
+│ - 统计      │ ├─────────────────────────────────────────────┤│
+│             │ │ SerialSendBar                               ││
+│             │ └─────────────────────────────────────────────┘│
+└─────────────┴───────────────────────────────────────────────┘
+```
+
+### 数据流
+```
+后端 Rust DataSource (Local/TCP)
+    ↓ (receive)
+emit("serial-data", bytes)
+    ↓
+useSerialEvents Hook
+    ↓
+parseSerialData() → SerialLine[]
+    ↓
+serialStore
+    ↓
+复用: 颜色解析 / 图表解析
+    ↓
+SerialViewer / RttChartViewer
+```
+
 ## [0.5.6] - 2026-01-24
 
 ### 改进
@@ -525,6 +621,7 @@ SEGGER_RTT_printf(0, "%.1f,%.1f,%.1f\n", temp, humi, press);
 
 ---
 
+[0.6.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.5.6...v0.6.0
 [0.5.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.0...v0.4.1

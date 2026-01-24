@@ -1,9 +1,10 @@
 pub mod commands;
 pub mod error;
 pub mod pack;
+pub mod serial;
 pub mod state;
 
-use commands::{config, flash, memory, probe, rtt};
+use commands::{config, flash, memory, probe, rtt, serial as serial_cmd};
 use state::AppState;
 use tauri::Manager;
 
@@ -63,6 +64,16 @@ pub fn run() {
             config::check_outdated_packs,
             config::rescan_pack,
             config::rescan_all_outdated_packs,
+            // 串口命令
+            serial_cmd::list_serial_ports_cmd,
+            serial_cmd::connect_serial,
+            serial_cmd::disconnect_serial,
+            serial_cmd::write_serial,
+            serial_cmd::write_serial_string,
+            serial_cmd::start_serial,
+            serial_cmd::stop_serial,
+            serial_cmd::get_serial_status,
+            serial_cmd::clear_serial_buffer,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时出错");
