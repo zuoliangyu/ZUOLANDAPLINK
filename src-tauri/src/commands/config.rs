@@ -4,6 +4,7 @@ use crate::pack::target_gen;
 use probe_rs::config::{add_target_from_yaml, get_target_by_name, families};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChipInfo {
@@ -202,7 +203,7 @@ pub async fn init_packs() -> AppResult<usize> {
 
         let pack_dir = manager.get_pack_dir(&pack.name);
 
-        match register_pack_devices(&pack_dir, &pack.name) {
+        match register_pack_devices(&pack_dir, &pack.name, None) {
             Ok(count) => {
                 total_devices += count;
                 log::info!("从 Pack {} 加载了 {} 个设备", pack.name, count);
@@ -247,12 +248,16 @@ fn get_fallback_chip(chip_name: &str) -> Option<String> {
 }
 
 /// 从 Pack 目录注册设备到 probe-rs
-fn register_pack_devices(pack_dir: &PathBuf, pack_name: &str) -> AppResult<usize> {
+fn register_pack_devices(
+    pack_dir: &PathBuf,
+    pack_name: &str,
+    progress_callback: Option<&crate::pack::progress::ProgressCallback>,
+) -> AppResult<usize> {
     #[cfg(debug_assertions)]
     println!("  📂 Pack 目录: {:?}", pack_dir);
 
     // 解析 Pack 中的设备定义
-    let devices = target_gen::parse_devices_from_pack(pack_dir)?;
+    let devices = target_gen::parse_devices_from_pack(pack_dir, progress_callback)?;
 
     if devices.is_empty() {
         return Err(AppError::PackError("Pack 中未找到设备定义".to_string()));
@@ -272,7 +277,7 @@ fn register_pack_devices(pack_dir: &PathBuf, pack_name: &str) -> AppResult<usize
     log::info!("从 Pack {} 解析到 {} 个设备", pack_name, devices.len());
 
     // 生成 probe-rs YAML 格式（包含 Flash 算法）
-    let yaml_content = target_gen::generate_probe_rs_yaml_with_algo(&devices, pack_name, pack_dir)?;
+    let yaml_content = target_gen::generate_probe_rs_yaml_with_algo(&devices, pack_name, pack_dir, progress_callback)?;
 
     // 保存 YAML 文件到 Pack 目录
     let yaml_path = pack_dir.join("targets.yaml");
@@ -296,6 +301,22 @@ fn register_pack_devices(pack_dir: &PathBuf, pack_name: &str) -> AppResult<usize
             log::info!("成功注册 {} 个设备到 probe-rs（包含 Flash 算法）", devices.len());
             #[cfg(debug_assertions)]
             println!("  ✅ 成功注册到 probe-rs");
+
+            // 生成并保存扫描报告
+            match target_gen::generate_scan_report(&devices, pack_name, pack_dir) {
+                Ok(report) => {
+                    if let Err(e) = target_gen::save_scan_report(&report, pack_dir) {
+                        log::warn!("保存扫描报告失败: {}", e);
+                    } else {
+                        log::info!("扫描报告已生成: {} 个设备，{} 个有算法，{} 个无算法",
+                            report.total_devices, report.devices_with_algo, report.devices_without_algo);
+                    }
+                }
+                Err(e) => {
+                    log::warn!("生成扫描报告失败: {}", e);
+                }
+            }
+
             Ok(devices.len())
         }
         Err(e) => {
@@ -390,7 +411,7 @@ pub async fn get_chip_info(chip_name: String) -> AppResult<ChipInfo> {
 }
 
 #[tauri::command]
-pub async fn import_pack(pack_path: String) -> AppResult<PackInfo> {
+pub async fn import_pack(app: tauri::AppHandle, pack_path: String) -> AppResult<PackInfo> {
     let path = PathBuf::from(&pack_path);
 
     if !path.exists() {
@@ -403,7 +424,13 @@ pub async fn import_pack(pack_path: String) -> AppResult<PackInfo> {
     // 导入后，尝试从 Pack 中提取设备定义并注册到 probe-rs
     let pack_dir = manager.get_pack_dir(&pack_info.name);
 
-    match register_pack_devices(&pack_dir, &pack_info.name) {
+    // 创建进度回调，通过Tauri事件发送进度
+    use crate::pack::progress::{PackScanProgress, ProgressCallback};
+    let callback: ProgressCallback = Box::new(move |progress: PackScanProgress| {
+        let _ = app.emit("pack-scan-progress", &progress);
+    });
+
+    match register_pack_devices(&pack_dir, &pack_info.name, Some(&callback)) {
         Ok(count) => {
             log::info!("成功从 Pack {} 注册了 {} 个设备到 probe-rs", pack_info.name, count);
         }
@@ -471,4 +498,90 @@ pub async fn load_project_config(file_path: String) -> AppResult<ProjectConfig> 
     let content = std::fs::read_to_string(&file_path)?;
     let config: ProjectConfig = serde_json::from_str(&content)?;
     Ok(config)
+}
+
+/// 获取Pack扫描报告
+#[tauri::command]
+pub async fn get_pack_scan_report(pack_name: String) -> AppResult<crate::pack::scan_report::PackScanReport> {
+    let manager = PackManager::new()?;
+    let pack_dir = manager.get_pack_dir(&pack_name);
+
+    target_gen::load_scan_report(&pack_dir)
+}
+
+/// 获取无算法的设备列表
+#[tauri::command]
+pub async fn get_devices_without_algorithm(pack_name: String) -> AppResult<Vec<String>> {
+    let manager = PackManager::new()?;
+    let pack_dir = manager.get_pack_dir(&pack_name);
+
+    let report = target_gen::load_scan_report(&pack_dir)?;
+    Ok(report.get_devices_without_algorithm())
+}
+
+/// 检查所有Pack的扫描器版本,返回需要重新扫描的Pack列表
+#[tauri::command]
+pub async fn check_outdated_packs() -> AppResult<Vec<PackInfo>> {
+    let manager = PackManager::new()?;
+    let packs = manager.list_packs()?;
+
+    let mut outdated_packs = Vec::new();
+
+    for pack in packs {
+        let pack_dir = manager.get_pack_dir(&pack.name);
+        if target_gen::needs_rescan(&pack_dir) {
+            outdated_packs.push(pack);
+        }
+    }
+
+    Ok(outdated_packs)
+}
+
+/// 重新扫描指定的Pack
+#[tauri::command]
+pub async fn rescan_pack(app: tauri::AppHandle, pack_name: String) -> AppResult<usize> {
+    let manager = PackManager::new()?;
+    let pack_dir = manager.get_pack_dir(&pack_name);
+
+    if !pack_dir.exists() {
+        return Err(AppError::PackError(format!("Pack {} 不存在", pack_name)));
+    }
+
+    // 创建进度回调
+    use crate::pack::progress::{PackScanProgress, ProgressCallback};
+    let callback: ProgressCallback = Box::new(move |progress: PackScanProgress| {
+        let _ = app.emit("pack-scan-progress", &progress);
+    });
+
+    // 重新注册设备
+    match register_pack_devices(&pack_dir, &pack_name, Some(&callback)) {
+        Ok(count) => {
+            log::info!("成功重新扫描 Pack {}，注册了 {} 个设备", pack_name, count);
+            Ok(count)
+        }
+        Err(e) => {
+            log::error!("重新扫描 Pack {} 失败: {}", pack_name, e);
+            Err(e)
+        }
+    }
+}
+
+/// 批量重新扫描所有过期的Pack
+#[tauri::command]
+pub async fn rescan_all_outdated_packs(app: tauri::AppHandle) -> AppResult<Vec<String>> {
+    let outdated_packs = check_outdated_packs().await?;
+    let mut rescanned = Vec::new();
+
+    for pack in outdated_packs {
+        match rescan_pack(app.clone(), pack.name.clone()).await {
+            Ok(_) => {
+                rescanned.push(pack.name);
+            }
+            Err(e) => {
+                log::warn!("重新扫描 Pack {} 失败: {}", pack.name, e);
+            }
+        }
+    }
+
+    Ok(rescanned)
 }

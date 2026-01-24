@@ -2,6 +2,18 @@
 
 ## 文档规范
 
+### 文档目录结构
+
+**根目录文档** (仅限以下3个):
+- `README.md` - 项目主页和概述
+- `CHANGELOG.md` - 版本更新日志
+- `CLAUDE.md` - 项目开发规范(本文件)
+
+**docs/ 目录** - 用户使用文档:
+- 只放置面向用户的功能使用文档
+- 必须包含 `README.md` 作为文档索引
+- 所有用户文档都必须放在此目录
+
 ### docs/ 目录用途
 
 **只放置面向用户的功能使用文档**
@@ -18,18 +30,33 @@
 - 开发调试记录
 - 代码实现说明
 - 中间过程文档
+- 任何开发者内部文档
 
-### 示例
+### 文档命名规范
 
 **好的文档标题**：
-- `RTT_USAGE.md` - RTT 功能使用指南
-- `PACK_IMPORT.md` - 如何导入 CMSIS-Pack
-- `FLASH_GUIDE.md` - 固件烧录指南
+- `RTT_USER_MANUAL.md` - RTT 功能用户手册
+- `QUICK_START.md` - 快速开始指南
+- `UPDATE_GUIDE.md` - 更新功能使用指南
 
 **不好的文档标题**：
 - `FLASH_ALGORITHM_IMPLEMENTATION.md` - 实现细节
 - `GD32F470_SOLUTION.md` - 问题解决过程
 - `PACK_INTEGRATION_GUIDE.md` - 集成开发指南
+- `DEBUG_NOTES.md` - 调试记录
+
+### 文档清理规则
+
+**创建文档时**:
+- 开发调试文档、问题分析文档等临时文档不应提交到仓库
+- 如果创建了临时文档,完成后必须删除
+- 只保留面向用户的使用文档
+
+**检查清单**:
+- [ ] 根目录只有 README.md、CHANGELOG.md、CLAUDE.md
+- [ ] docs/ 目录只包含用户使用文档
+- [ ] docs/ 目录包含 README.md 索引文件
+- [ ] 没有调试、开发、问题解决等过程文档
 
 ## 代码规范
 

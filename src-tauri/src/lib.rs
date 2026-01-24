@@ -15,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(AppState::new());
             Ok(())
@@ -56,6 +57,12 @@ pub fn run() {
             config::get_flash_algorithms,
             config::save_project_config,
             config::load_project_config,
+            config::get_pack_scan_report,
+            config::get_devices_without_algorithm,
+            // Pack版本管理命令
+            config::check_outdated_packs,
+            config::rescan_pack,
+            config::rescan_all_outdated_packs,
         ])
         .run(tauri::generate_context!())
         .expect("启动应用程序时出错");

@@ -1,4 +1,5 @@
 import { ModeSwitch } from "./ModeSwitch";
+import { UpdateChecker } from "../UpdateChecker";
 import { useProbeStore } from "@/stores/probeStore";
 import { useRttStore } from "@/stores/rttStore";
 import { useFlashStore } from "@/stores/flashStore";
@@ -95,6 +96,9 @@ export function TopBar() {
 
       {/* Right Status Area */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        {/* Update Checker */}
+        <UpdateChecker />
+
         {/* RTT Connection Status */}
         {rttConnected && !rttRunning && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-yellow-500/10">

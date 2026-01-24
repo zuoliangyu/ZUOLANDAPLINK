@@ -130,6 +130,26 @@ export async function deletePack(packName: string): Promise<void> {
   return await invoke("delete_pack", { packName });
 }
 
+export async function getPackScanReport(packName: string): Promise<any> {
+  return await invoke("get_pack_scan_report", { packName });
+}
+
+export async function getDevicesWithoutAlgorithm(packName: string): Promise<string[]> {
+  return await invoke("get_devices_without_algorithm", { packName });
+}
+
+export async function checkOutdatedPacks(): Promise<PackInfo[]> {
+  return await invoke("check_outdated_packs");
+}
+
+export async function rescanPack(packName: string): Promise<number> {
+  return await invoke("rescan_pack", { packName });
+}
+
+export async function rescanAllOutdatedPacks(): Promise<string[]> {
+  return await invoke("rescan_all_outdated_packs");
+}
+
 export async function getFlashAlgorithms(chipName: string): Promise<FlashAlgorithmInfo[]> {
   return await invoke<FlashAlgorithmInfo[]>("get_flash_algorithms", { chipName });
 }

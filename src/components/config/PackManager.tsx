@@ -6,13 +6,51 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { importPack, listImportedPacks, deletePack } from "@/lib/tauri";
+import { listen } from "@tauri-apps/api/event";
+import {
+  importPack,
+  listImportedPacks,
+  deletePack,
+  getPackScanReport,
+} from "@/lib/tauri";
 import type { PackInfo } from "@/lib/types";
 import { useLogStore } from "@/stores/logStore";
-import { Package, Upload, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Package, Upload, Trash2, ChevronDown, ChevronRight, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Pack扫描进度类型
+interface PackScanProgress {
+  phase: string;
+  current_item: string;
+  current: number;
+  total: number;
+  progress: number;
+  message: string;
+}
+
+// 阶段标签映射
+function getPhaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    Parsing: "解析PDSC",
+    ExtractingDevices: "提取设备",
+    FindingAlgorithms: "查找算法",
+    MatchingAlgorithms: "匹配算法",
+    GeneratingYaml: "生成配置",
+    Registering: "注册设备",
+    Complete: "完成",
+  };
+  return labels[phase] || phase;
+}
 
 export function PackManager() {
   const [packs, setPacks] = useState<PackInfo[]>([]);
@@ -20,11 +58,32 @@ export function PackManager() {
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [scanProgress, setScanProgress] = useState<PackScanProgress | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [selectedPackReport, setSelectedPackReport] = useState<any>(null);
   const addLog = useLogStore((state) => state.addLog);
 
   // Load imported Pack list
   useEffect(() => {
     loadPacks();
+  }, []);
+
+  // Listen for pack scan progress events
+  useEffect(() => {
+    const unlisten = listen<PackScanProgress>("pack-scan-progress", (event) => {
+      setScanProgress(event.payload);
+
+      // 当扫描完成时，清除进度显示
+      if (event.payload.phase === "Complete") {
+        setTimeout(() => {
+          setScanProgress(null);
+        }, 2000);
+      }
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   // Listen for file drag-drop events
@@ -133,6 +192,17 @@ export function PackManager() {
     }
   };
 
+  // View scan report
+  const handleViewReport = async (packName: string) => {
+    try {
+      const report = await getPackScanReport(packName);
+      setSelectedPackReport(report);
+      setReportDialogOpen(true);
+    } catch (error) {
+      addLog("error", `加载扫描报告失败: ${error}`);
+    }
+  };
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={cn(
@@ -184,6 +254,31 @@ export function PackManager() {
               </div>
             )}
 
+            {/* Pack scan progress */}
+            {scanProgress && (
+              <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">扫描进度</span>
+                  <span className="text-xs text-muted-foreground">
+                    {Math.round(scanProgress.progress * 100)}%
+                  </span>
+                </div>
+                <Progress value={scanProgress.progress * 100} className="h-2" />
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span>阶段: {getPhaseLabel(scanProgress.phase)}</span>
+                    {scanProgress.current > 0 && scanProgress.total > 0 && (
+                      <span>{scanProgress.current}/{scanProgress.total}</span>
+                    )}
+                  </div>
+                  {scanProgress.current_item && (
+                    <div className="truncate">当前: {scanProgress.current_item}</div>
+                  )}
+                  <div>{scanProgress.message}</div>
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <div className="text-center text-sm text-muted-foreground py-4">
                 加载中...
@@ -197,7 +292,7 @@ export function PackManager() {
               packs.map((pack) => (
                 <div
                   key={pack.name}
-                  className="border rounded-lg p-3 space-y-1 hover:bg-muted/50 transition-colors"
+                  className="border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -206,15 +301,26 @@ export function PackManager() {
                         {pack.vendor} • v{pack.version}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(pack.name)}
-                      title="删除Pack"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-primary"
+                        onClick={() => handleViewReport(pack.name)}
+                        title="查看扫描报告"
+                      >
+                        <FileText className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDelete(pack.name)}
+                        title="删除Pack"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                   {pack.description && (
                     <div className="text-xs text-muted-foreground line-clamp-2">
@@ -230,6 +336,94 @@ export function PackManager() {
           </CardContent>
         </CollapsibleContent>
       </Card>
+
+      {/* Scan Report Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pack 扫描报告</DialogTitle>
+            <DialogDescription>
+              {selectedPackReport && `${selectedPackReport.pack_name} - ${selectedPackReport.scan_time}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPackReport && (
+            <div className="space-y-4">
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="border rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold">{selectedPackReport.total_devices}</div>
+                  <div className="text-xs text-muted-foreground">总设备数</div>
+                </div>
+                <div className="border rounded-lg p-3 text-center bg-green-50 dark:bg-green-950">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {selectedPackReport.devices_with_algo}
+                  </div>
+                  <div className="text-xs text-muted-foreground">有算法</div>
+                </div>
+                <div className="border rounded-lg p-3 text-center bg-yellow-50 dark:bg-yellow-950">
+                  <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {selectedPackReport.devices_without_algo}
+                  </div>
+                  <div className="text-xs text-muted-foreground">无算法</div>
+                </div>
+              </div>
+
+              {/* Algorithm Statistics */}
+              {selectedPackReport.algorithm_stats.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">算法使用统计</h3>
+                  <div className="space-y-1">
+                    {selectedPackReport.algorithm_stats.slice(0, 5).map((stat: any) => (
+                      <div key={stat.algorithm_name} className="flex items-center justify-between text-xs border rounded p-2">
+                        <span className="font-mono">{stat.algorithm_name}</span>
+                        <span className="text-muted-foreground">{stat.device_count} 个设备</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Devices without algorithm */}
+              {selectedPackReport.devices_without_algo > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    无算法的设备
+                  </h3>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {selectedPackReport.devices
+                      .filter((d: any) => d.status === "Warning")
+                      .slice(0, 20)
+                      .map((device: any) => (
+                        <div key={device.name} className="text-xs border rounded p-2 bg-yellow-50 dark:bg-yellow-950">
+                          <div className="font-medium">{device.name}</div>
+                          <div className="text-muted-foreground">
+                            {device.core} • Flash: {(device.flash_size / 1024).toFixed(0)}KB
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All devices summary */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">设备列表</h3>
+                <div className="text-xs text-muted-foreground">
+                  共 {selectedPackReport.total_devices} 个设备
+                  {selectedPackReport.devices_with_algo > 0 && (
+                    <span className="ml-2 text-green-600 dark:text-green-400">
+                      <CheckCircle className="inline h-3 w-3 mr-1" />
+                      {selectedPackReport.devices_with_algo} 个已配置算法
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   );
 }
