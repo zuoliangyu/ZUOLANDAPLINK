@@ -6,6 +6,7 @@ import type {
   ConnectionStatus,
   ChipInfo,
   FlashOptions,
+  FirmwareFileInfo,
   PackInfo,
   ProjectConfig,
   RttConfig,
@@ -65,6 +66,10 @@ export async function verifyFirmware(filePath: string): Promise<boolean> {
 
 export async function readFlash(address: number, size: number): Promise<number[]> {
   return await invoke<number[]>("read_flash", { options: { address, size } });
+}
+
+export async function getFirmwareInfo(filePath: string): Promise<FirmwareFileInfo> {
+  return await invoke<FirmwareFileInfo>("get_firmware_info", { filePath });
 }
 
 // 内存命令

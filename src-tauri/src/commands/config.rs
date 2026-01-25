@@ -1,10 +1,16 @@
 use crate::error::{AppError, AppResult};
 use crate::pack::manager::{PackManager, PackInfo};
 use crate::pack::target_gen;
-use probe_rs::config::{add_target_from_yaml, get_target_by_name, families};
+use probe_rs::config::Registry;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::Emitter;
+
+// Global target registry - probe-rs 0.31 uses instance-based Registry
+lazy_static::lazy_static! {
+    static ref TARGET_REGISTRY: Mutex<Registry> = Mutex::new(Registry::from_builtin_families());
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChipInfo {
@@ -157,7 +163,8 @@ pub async fn search_chips(query: String) -> AppResult<Vec<String>> {
     all_chips.extend(builtin_matched);
 
     // 2. 从 probe-rs 注册的所有目标中搜索（包含从 Pack 导入的）
-    for family in families() {
+    let registry = TARGET_REGISTRY.lock().unwrap();
+    for family in registry.families() {
         for variant in family.variants() {
             let chip_name = variant.name.clone();
             if chip_name.to_lowercase().contains(&query_lower) {
@@ -168,6 +175,7 @@ pub async fn search_chips(query: String) -> AppResult<Vec<String>> {
             }
         }
     }
+    drop(registry);
 
     // 限制返回数量并排序
     all_chips.sort();
@@ -285,7 +293,7 @@ fn register_pack_devices(
 
     log::info!("生成 YAML 文件: {:?}", yaml_path);
 
-    // 注册到 probe-rs（需要将字符串转换为字节流）
+    // 注册到 probe-rs
     #[cfg(debug_assertions)]
     {
         println!("  📝 YAML 文件大小: {} 字节", yaml_content.len());
@@ -296,7 +304,8 @@ fn register_pack_devices(
         println!("  📝 调试 YAML 已保存到: {:?}", debug_yaml_path);
     }
 
-    match add_target_from_yaml(yaml_content.as_bytes()) {
+    let mut registry = TARGET_REGISTRY.lock().unwrap();
+    match registry.add_target_family_from_yaml(&yaml_content) {
         Ok(_) => {
             log::info!("成功注册 {} 个设备到 probe-rs（包含 Flash 算法）", devices.len());
             #[cfg(debug_assertions)]
@@ -334,7 +343,8 @@ fn register_pack_devices(
 #[tauri::command]
 pub async fn get_chip_info(chip_name: String) -> AppResult<ChipInfo> {
     // 尝试从probe-rs获取目标信息
-    let target = match get_target_by_name(&chip_name) {
+    let registry = TARGET_REGISTRY.lock().unwrap();
+    let target = match registry.get_target_by_name(&chip_name) {
         Ok(t) => t,
         Err(e) => {
             // 如果找不到精确匹配，尝试使用家族名称作为回退
@@ -342,7 +352,7 @@ pub async fn get_chip_info(chip_name: String) -> AppResult<ChipInfo> {
             let fallback_chip = get_fallback_chip(&chip_name);
             if let Some(fallback) = fallback_chip {
                 log::warn!("芯片 {} 不在 probe-rs 数据库中，尝试使用兼容芯片: {}", chip_name, fallback);
-                get_target_by_name(&fallback)
+                registry.get_target_by_name(&fallback)
                     .map_err(|e2| AppError::ConfigError(format!(
                         "未找到芯片 {} 及其兼容芯片 {}: 原始错误: {}, 回退错误: {}",
                         chip_name, fallback, e, e2
@@ -458,7 +468,8 @@ pub async fn delete_pack(pack_name: String) -> AppResult<()> {
 
 #[tauri::command]
 pub async fn get_flash_algorithms(chip_name: String) -> AppResult<Vec<FlashAlgorithmInfo>> {
-    let target = get_target_by_name(&chip_name)
+    let registry = TARGET_REGISTRY.lock().unwrap();
+    let target = registry.get_target_by_name(&chip_name)
         .map_err(|e| AppError::ConfigError(format!("未找到芯片: {}", e)))?;
 
     let algorithms: Vec<FlashAlgorithmInfo> = target

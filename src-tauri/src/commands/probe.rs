@@ -10,12 +10,36 @@ use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProbeInfo {
+    pub probe_id: String,
     pub identifier: String,
     pub vendor_id: u16,
     pub product_id: u16,
     pub serial_number: Option<String>,
     pub probe_type: String,
     pub dap_version: Option<String>,
+    pub debug_info: Option<String>,  // 诊断信息
+}
+
+/// USB 设备诊断信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsbDeviceInfo {
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub manufacturer: Option<String>,
+    pub product: Option<String>,
+    pub serial_number: Option<String>,
+    pub bus_number: u8,
+    pub device_address: u8,
+    pub interfaces: Vec<UsbInterfaceInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsbInterfaceInfo {
+    pub interface_number: u8,
+    pub class: u8,
+    pub subclass: u8,
+    pub protocol: u8,
+    pub interface_string: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +57,127 @@ pub struct MemoryRegion {
     pub kind: String,
     pub address: u64,
     pub size: u64,
+}
+
+#[derive(Debug, Clone)]
+struct CmsisDapCaps {
+    vendor_id: u16,
+    product_id: u16,
+    serial_number: Option<String>,
+    has_hid: bool,
+    has_v2: bool,
+    debug_info: String,  // 诊断信息
+}
+
+fn is_cmsis_dap_str(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    lower.contains("cmsis-dap") || lower.contains("cmsis_dap")
+}
+
+fn collect_cmsis_dap_caps() -> Vec<CmsisDapCaps> {
+    let mut caps = Vec::new();
+
+    let devices = match nusb::list_devices() {
+        Ok(devices) => devices,
+        Err(e) => {
+            log::warn!("nusb list_devices failed: {}", e);
+            return caps;
+        }
+    };
+
+    for device in devices {
+        let vid = device.vendor_id();
+        let pid = device.product_id();
+        let product_str = device.product_string().unwrap_or("");
+        let product_is_cmsis = is_cmsis_dap_str(product_str);
+
+        // 只处理可能是 CMSIS-DAP 的设备
+        let dominated_vid = vid == 0xFAED || vid == 0x0D28 || vid == 0xC251 || vid == 0x1366 || vid == 0x0483;
+        if !dominated_vid && !product_is_cmsis {
+            continue;
+        }
+
+        let mut debug_lines = Vec::new();
+        debug_lines.push(format!("VID={:#06x} PID={:#06x}", vid, pid));
+        debug_lines.push(format!("Product: {:?}", product_str));
+
+        let mut has_hid = false;
+        let mut has_v2 = false;
+
+        for iface in device.interfaces() {
+            let iface_num = iface.interface_number();
+            let iface_class = iface.class();
+            let iface_subclass = iface.subclass();
+            let iface_protocol = iface.protocol();
+            let iface_str = iface.interface_string().unwrap_or("");
+            let iface_is_cmsis = is_cmsis_dap_str(iface_str);
+
+            debug_lines.push(format!(
+                "Interface {}: class={:#04x} sub={:#04x} proto={:#04x} str={:?}",
+                iface_num, iface_class, iface_subclass, iface_protocol, iface_str
+            ));
+
+            // HID class = 0x03, Vendor Specific class = 0xFF
+            if iface_class == 0x03 && (iface_is_cmsis || product_is_cmsis) {
+                debug_lines.push(format!("  -> HID interface (DAPv1)"));
+                has_hid = true;
+            } else if iface_class == 0xFF && (iface_is_cmsis || product_is_cmsis) {
+                debug_lines.push(format!("  -> Vendor Specific (potential DAPv2)"));
+                has_v2 = true;
+            }
+        }
+
+        debug_lines.push(format!("Summary: has_hid={}, has_v2={}", has_hid, has_v2));
+
+        if product_is_cmsis || has_hid || has_v2 {
+            caps.push(CmsisDapCaps {
+                vendor_id: vid,
+                product_id: pid,
+                serial_number: device.serial_number().map(|s| s.to_string()).filter(|s| !s.is_empty()),
+                has_hid,
+                has_v2,
+                debug_info: debug_lines.join("\n"),
+            });
+        }
+    }
+
+    caps
+}
+
+fn match_caps_for_probe<'a>(
+    probe: &probe_rs::probe::DebugProbeInfo,
+    caps: &'a [CmsisDapCaps],
+) -> Option<&'a CmsisDapCaps> {
+    let probe_serial = probe.serial_number.as_deref().filter(|s| !s.is_empty());
+
+    let direct_match = caps.iter().find(|c| {
+        if c.vendor_id != probe.vendor_id || c.product_id != probe.product_id {
+            return false;
+        }
+        let cap_serial = c.serial_number.as_deref().filter(|s| !s.is_empty());
+        match (probe_serial, cap_serial) {
+            (Some(p), Some(c)) => p == c,
+            (None, None) => true,
+            _ => false,
+        }
+    });
+
+    if direct_match.is_some() {
+        return direct_match;
+    }
+
+    if probe_serial.is_none() {
+        return caps
+            .iter()
+            .find(|c| c.vendor_id == probe.vendor_id && c.product_id == probe.product_id);
+    }
+
+    None
+}
+
+fn build_probe_id(vendor_id: u16, product_id: u16, serial_number: &Option<String>) -> String {
+    let serial = serial_number.as_deref().unwrap_or("");
+    format!("{:04x}:{:04x}:{}", vendor_id, product_id, serial)
 }
 
 /// Try to read the chip IDCODE
@@ -80,16 +225,92 @@ fn read_dp_idcode(session: &mut Session) -> Option<u32> {
 
 #[tauri::command]
 pub async fn list_probes() -> AppResult<Vec<ProbeInfo>> {
+    // 使用 nusb 收集 CMSIS-DAP 能力信息
+    let caps = collect_cmsis_dap_caps();
+    log::info!("=== CMSIS-DAP Capabilities from nusb ===");
+    for cap in &caps {
+        log::info!(
+            "Device VID={:#06x}, PID={:#06x}, serial={:?}, has_hid={}, has_v2={}",
+            cap.vendor_id, cap.product_id, cap.serial_number, cap.has_hid, cap.has_v2
+        );
+    }
+
+    // probe-rs 枚举
     let lister = Lister::new();
     let probes = lister.list_all();
 
-    let probe_infos: Vec<ProbeInfo> = probes
-        .into_iter()
-        .map(|p| {
-            let probe_type_str = format!("{:?}", p.probe_type());
+    log::info!("=== Probe enumeration (probe-rs) ===");
+    log::info!("Total probes found: {}", probes.len());
 
-            // 判断DAP版本：支持 CMSIS-DAP 和 CmsisDap 两种格式
-            // probe_type 可能是 "CMSIS-DAP" 或 "CmsisDap" 或 "CmsisDapV2"
+    let mut probe_infos: Vec<ProbeInfo> = Vec::new();
+
+    for p in probes {
+        let probe_type_str = format!("{:?}", p.probe_type());
+
+        log::info!(
+            "Probe: identifier={}, VID={:#06x}, PID={:#06x}, serial={:?}, type={}",
+            p.identifier,
+            p.vendor_id,
+            p.product_id,
+            p.serial_number,
+            probe_type_str
+        );
+
+        // 使用 nusb 能力信息来判断 DAP 版本
+        let matched_caps = match_caps_for_probe(&p, &caps);
+
+        if let Some(cap) = matched_caps {
+            log::info!("  -> Matched caps: has_hid={}, has_v2={}", cap.has_hid, cap.has_v2);
+
+            // 如果设备同时支持 HID 和 WinUSB，合并为一个条目（probe-rs 自动选择最优协议）
+            if cap.has_hid && cap.has_v2 {
+                probe_infos.push(ProbeInfo {
+                    probe_id: build_probe_id(p.vendor_id, p.product_id, &p.serial_number),
+                    identifier: p.identifier.clone(),
+                    vendor_id: p.vendor_id,
+                    product_id: p.product_id,
+                    serial_number: p.serial_number.clone(),
+                    probe_type: "CmsisDap".to_string(),
+                    dap_version: Some("DAPv1+v2 (HID/WinUSB)".to_string()),
+                    debug_info: Some(cap.debug_info.clone()),
+                });
+            } else if cap.has_v2 {
+                probe_infos.push(ProbeInfo {
+                    probe_id: build_probe_id(p.vendor_id, p.product_id, &p.serial_number),
+                    identifier: p.identifier.clone(),
+                    vendor_id: p.vendor_id,
+                    product_id: p.product_id,
+                    serial_number: p.serial_number.clone(),
+                    probe_type: "CmsisDapV2".to_string(),
+                    dap_version: Some("DAPv2 (WinUSB)".to_string()),
+                    debug_info: Some(cap.debug_info.clone()),
+                });
+            } else if cap.has_hid {
+                probe_infos.push(ProbeInfo {
+                    probe_id: build_probe_id(p.vendor_id, p.product_id, &p.serial_number),
+                    identifier: p.identifier.clone(),
+                    vendor_id: p.vendor_id,
+                    product_id: p.product_id,
+                    serial_number: p.serial_number.clone(),
+                    probe_type: "CmsisDap".to_string(),
+                    dap_version: Some("DAPv1 (HID)".to_string()),
+                    debug_info: Some(cap.debug_info.clone()),
+                });
+            } else {
+                // 未知类型，直接添加
+                probe_infos.push(ProbeInfo {
+                    probe_id: build_probe_id(p.vendor_id, p.product_id, &p.serial_number),
+                    identifier: p.identifier.clone(),
+                    vendor_id: p.vendor_id,
+                    product_id: p.product_id,
+                    serial_number: p.serial_number.clone(),
+                    probe_type: probe_type_str,
+                    dap_version: None,
+                    debug_info: Some(cap.debug_info.clone()),
+                });
+            }
+        } else {
+            // 未匹配到 nusb 能力信息，使用 probe_type 判断
             let probe_type_upper = probe_type_str.to_uppercase();
             let dap_version = if probe_type_upper.contains("CMSIS") || probe_type_upper.contains("DAP") {
                 if probe_type_upper.contains("V2") {
@@ -101,16 +322,20 @@ pub async fn list_probes() -> AppResult<Vec<ProbeInfo>> {
                 None
             };
 
-            ProbeInfo {
+            probe_infos.push(ProbeInfo {
+                probe_id: build_probe_id(p.vendor_id, p.product_id, &p.serial_number),
                 identifier: p.identifier.clone(),
                 vendor_id: p.vendor_id,
                 product_id: p.product_id,
                 serial_number: p.serial_number.clone(),
                 probe_type: probe_type_str,
                 dap_version,
-            }
-        })
-        .collect();
+                debug_info: None,
+            });
+        }
+    }
+
+    log::info!("=== Probe enumeration end, total {} entries ===", probe_infos.len());
 
     Ok(probe_infos)
 }
@@ -431,4 +656,89 @@ pub async fn get_rtt_connection_status(state: State<'_, AppState>) -> AppResult<
         connected,
         info: rtt_conn_info.clone(),
     })
+}
+
+/// 诊断命令：列出所有 USB 设备（特别是 CMSIS-DAP 相关的）
+#[tauri::command]
+pub async fn diagnose_usb_devices() -> AppResult<Vec<UsbDeviceInfo>> {
+    log::info!("=== USB Device Diagnosis Start ===");
+
+    let mut devices = Vec::new();
+
+    for device_info in nusb::list_devices().map_err(|e| AppError::ProbeError(e.to_string()))? {
+        let vid = device_info.vendor_id();
+        let pid = device_info.product_id();
+
+        // 只显示可能是 DAP 的设备 (VID=0xFAED 或其他已知 CMSIS-DAP VID)
+        let is_potential_dap = vid == 0xFAED  // Ahypnis
+            || vid == 0x0D28  // ARM DAPLink
+            || vid == 0xC251  // Keil
+            || vid == 0x1366  // SEGGER
+            || vid == 0x0483; // STMicroelectronics
+
+        if !is_potential_dap {
+            continue;
+        }
+
+        let manufacturer = device_info.manufacturer_string().map(|s| s.to_string());
+        let product = device_info.product_string().map(|s| s.to_string());
+        let serial = device_info.serial_number().map(|s| s.to_string());
+
+        log::info!(
+            "Found USB device: VID={:#06x}, PID={:#06x}, bus={}, addr={}",
+            vid, pid,
+            device_info.bus_number(),
+            device_info.device_address()
+        );
+        log::info!("  Manufacturer: {:?}", manufacturer);
+        log::info!("  Product: {:?}", product);
+        log::info!("  Serial: {:?}", serial);
+
+        // 获取接口信息
+        let mut interfaces = Vec::new();
+        for iface in device_info.interfaces() {
+            let iface_str = iface.interface_string().map(|s| s.to_string());
+
+            log::info!(
+                "    Interface {}: class={:#04x}, subclass={:#04x}, protocol={:#04x}, string={:?}",
+                iface.interface_number(),
+                iface.class(),
+                iface.subclass(),
+                iface.protocol(),
+                iface_str
+            );
+
+            // 检查是否是 CMSIS-DAP v2 (Vendor class + 包含 "CMSIS-DAP" 字符串)
+            let is_cmsis_dap_v2 = iface.class() == 0xFF  // Vendor Specific
+                && iface_str.as_ref().map(|s| s.contains("CMSIS-DAP")).unwrap_or(false);
+
+            if is_cmsis_dap_v2 {
+                log::info!("    ^^^ This is CMSIS-DAP v2 interface!");
+            }
+
+            interfaces.push(UsbInterfaceInfo {
+                interface_number: iface.interface_number(),
+                class: iface.class(),
+                subclass: iface.subclass(),
+                protocol: iface.protocol(),
+                interface_string: iface_str,
+            });
+        }
+
+        devices.push(UsbDeviceInfo {
+            vendor_id: vid,
+            product_id: pid,
+            manufacturer,
+            product,
+            serial_number: serial,
+            bus_number: device_info.bus_number(),
+            device_address: device_info.device_address(),
+            interfaces,
+        });
+    }
+
+    log::info!("=== USB Device Diagnosis End ===");
+    log::info!("Found {} potential DAP devices", devices.len());
+
+    Ok(devices)
 }

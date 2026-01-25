@@ -29,7 +29,7 @@ import { useChipStore } from "@/stores/chipStore";
 import { useFlashStore } from "@/stores/flashStore";
 import { useLogStore } from "@/stores/logStore";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { flashFirmware, eraseChip, eraseSector, verifyFirmware, readFlash } from "@/lib/tauri";
+import { flashFirmware, eraseChip, eraseSector, verifyFirmware, readFlash, getFirmwareInfo } from "@/lib/tauri";
 import { listen } from "@tauri-apps/api/event";
 import type { FlashProgressEvent, EraseMode } from "@/lib/types";
 import { EraseDialog } from "@/components/dialogs/EraseDialog";
@@ -47,6 +47,7 @@ export function FlashToolbar() {
     flashing,
     setFlashing,
     setProgress,
+    setFirmwareSize,
     verifyAfterFlash,
     resetAfterFlash,
     eraseMode,
@@ -78,7 +79,19 @@ export function FlashToolbar() {
 
     if (file) {
       setFirmwarePath(file);
-      addLog("info", `已选择固件文件: ${file}`);
+      // 获取文件信息
+      try {
+        const fileInfo = await getFirmwareInfo(file);
+        if (fileInfo.exists) {
+          setFirmwareSize(fileInfo.size);
+          const sizeKB = (fileInfo.size / 1024).toFixed(1);
+          addLog("info", `已选择固件文件: ${file.split(/[\\/]/).pop()} (${sizeKB} KB)`);
+        } else {
+          addLog("warn", `已选择固件文件: ${file} (文件不存在)`);
+        }
+      } catch {
+        addLog("info", `已选择固件文件: ${file}`);
+      }
     }
   };
 
@@ -105,6 +118,20 @@ export function FlashToolbar() {
 
     try {
       setFlashing(true);
+      setProgress(0, "init", "重载固件文件...");
+
+      // 烧录前重载固件文件信息
+      const fileInfo = await getFirmwareInfo(firmwarePath);
+      if (!fileInfo.exists) {
+        addLog("error", `固件文件不存在: ${firmwarePath}`);
+        setFlashing(false);
+        return;
+      }
+
+      setFirmwareSize(fileInfo.size);
+      const sizeKB = (fileInfo.size / 1024).toFixed(1);
+      addLog("info", `已重载固件文件: ${firmwarePath.split(/[\\/]/).pop()} (${sizeKB} KB)`);
+
       setProgress(0, "init", "开始烧录");
       addLog("info", `开始烧录: ${firmwarePath}`);
 

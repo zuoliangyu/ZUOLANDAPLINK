@@ -1,6 +1,6 @@
 [package]
 name = "zuolandaplink"
-version = "0.6.1"
+version = "0.7.0"
 description = "DAPLINK RTTVIEW"
 authors = ["zuolan"]
 edition = "2021"
@@ -20,7 +20,8 @@ tauri-plugin-shell = "2"
 tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-probe-rs = "0.27"
+probe-rs = "0.31"
+nusb = "0.1.14"
 quick-xml = { version = "0.37", features = ["serialize"] }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
@@ -35,6 +36,7 @@ object = "0.36"
 base64 = "0.22"
 serialport = "4.3"
 async-trait = "0.1"
+lazy_static = "1.4"
 
 [features]
 default = ["custom-protocol"]

@@ -184,11 +184,11 @@ export function Sidebar() {
   };
 
   // 🔍 调试日志：查看当前选中的探针
-  console.log("🔍 当前渲染状态:", {
-    selectedProbe: selectedProbe,
-    hasDapVersion: selectedProbe?.dap_version ? "有" : "无",
-    dapVersion: selectedProbe?.dap_version,
-  });
+  // console.log("🔍 当前渲染状态:", {
+  //   selectedProbe: selectedProbe,
+  //   hasDapVersion: selectedProbe?.dap_version ? "有" : "无",
+  //   dapVersion: selectedProbe?.dap_version,
+  // });
 
   return (
     <aside className="w-72 border-r border-border bg-muted/30 overflow-y-auto p-3 space-y-3">
@@ -210,9 +210,9 @@ export function Sidebar() {
         </CardHeader>
         <CardContent className="space-y-2">
           <Select
-            value={selectedProbe?.identifier || ""}
+            value={selectedProbe?.probe_id || ""}
             onValueChange={(value) => {
-              const probe = probes.find((p) => p.identifier === value);
+              const probe = probes.find((p) => p.probe_id === value);
               selectProbe(probe || null);
             }}
             disabled={connected}
@@ -233,7 +233,7 @@ export function Sidebar() {
             </SelectTrigger>
             <SelectContent>
               {probes.map((probe) => (
-                <SelectItem key={probe.identifier} value={probe.identifier}>
+                <SelectItem key={probe.probe_id} value={probe.probe_id}>
                   <div className="flex items-center justify-between gap-2 w-full">
                     <span className="truncate">{probe.identifier}</span>
                     {probe.dap_version && (

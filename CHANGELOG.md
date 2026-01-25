@@ -5,6 +5,31 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.7.0] - 2026-01-25
+
+### 新增功能
+- ✨ **烧录前重载固件** - 烧录前自动重新读取固件文件，确保使用最新编译结果
+- ✨ **固件文件大小显示** - 选择和烧录时显示固件文件大小
+- ✨ **Flash 设置持久化** - 校验、复位、擦除模式等设置自动保存到本地
+
+### 改进
+- 🔧 **HID/WinUSB 合并显示** - 同时支持 HID 和 WinUSB 的设备合并为一个条目显示，简化用户体验
+- 🔧 **日志面板性能优化** - 使用 requestAnimationFrame 节流拖动操作，解决烧录时拖动卡死问题
+- 🔧 **默认关闭烧录校验** - 加快烧录速度，用户可手动开启
+
+### 依赖升级
+- 📦 **probe-rs 0.27 → 0.31** - 底层调试库重大升级
+  - 新增 ESP32 系列、CH32F1、Zynq-7000 SoC 等芯片支持
+  - 新增 STM32WB0、STM32U3、EFR32MG24 等目标
+  - 改进 CMSIS-DAP 兼容性，V1 协议变为可选
+  - 新增远程调试服务器/客户端功能
+  - 改进 ARMv7A/ARMv7R/ARMv8 调试支持
+  - 修复多个 RTT 和 Xtensa 相关问题
+
+### 修复
+- 🐛 修复日志面板在烧录过程中拖动导致界面卡死的问题
+- 🐛 修复拖动时文本被意外选中的问题
+
 ## [0.6.1] - 2026-01-25
 
 ### 新增功能
@@ -629,6 +654,8 @@ SEGGER_RTT_printf(0, "%.1f,%.1f,%.1f\n", temp, humi, press);
 
 ---
 
+[0.7.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.5.6...v0.6.0
 [0.5.0]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/zuoliangyu/ZUOLANDAPLINK/compare/v0.4.1...v0.4.2

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useLogStore } from "@/stores/logStore";
 import { formatTime } from "@/lib/utils";
 import { Trash2, GripHorizontal } from "lucide-react";
@@ -11,34 +11,53 @@ export function LogPanel() {
   const [isResizing, setIsResizing] = useState(false);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
-  // 自动滚动到底部（最新日志）
+  // 自动滚动到底部（最新日志）- 使用 requestAnimationFrame 节流
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current && !isResizing) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      });
     }
-  }, [logs]);
+  }, [logs, isResizing]);
 
   // 开始拖动
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
     startYRef.current = e.clientY;
     startHeightRef.current = height;
     e.preventDefault();
-  };
+    // 禁用文本选择
+    document.body.style.userSelect = "none";
+  }, [height]);
 
-  // 拖动中
+  // 拖动中 - 使用 requestAnimationFrame 节流
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
-      const deltaY = startYRef.current - e.clientY; // 向上拖动为正（手柄在顶部）
-      const newHeight = Math.max(80, Math.min(600, startHeightRef.current + deltaY));
-      setHeight(newHeight);
+      // 取消之前的 RAF
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      rafRef.current = requestAnimationFrame(() => {
+        const deltaY = startYRef.current - e.clientY;
+        const newHeight = Math.max(80, Math.min(600, startHeightRef.current + deltaY));
+        setHeight(newHeight);
+      });
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      document.body.style.userSelect = "";
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
 
     if (isResizing) {

@@ -27,6 +27,7 @@ pub fn run() {
             probe::connect_target,
             probe::disconnect,
             probe::get_connection_status,
+            probe::diagnose_usb_devices,
             // RTT 独立连接命令
             probe::connect_rtt,
             probe::disconnect_rtt,
@@ -37,6 +38,7 @@ pub fn run() {
             flash::erase_sector,
             flash::verify_firmware,
             flash::read_flash,
+            flash::get_firmware_info,
             // 内存命令
             memory::read_memory,
             memory::write_memory,

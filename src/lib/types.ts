@@ -1,11 +1,13 @@
 // 探针信息
 export interface ProbeInfo {
+  probe_id: string;
   identifier: string;
   vendor_id: number;
   product_id: number;
   serial_number: string | null;
   probe_type: string;
   dap_version: string | null;
+  debug_info: string | null;
 }
 
 // 连接选项
@@ -91,6 +93,7 @@ export interface FlashOptions {
   reset_after: boolean;
   erase_mode: EraseMode;
   flash_algorithm?: string; // 可选：指定使用的Flash算法名称
+  preverify?: boolean;      // 预校验：烧录前检查，跳过已正确的块（加速重复烧录）
 }
 
 // Flash进度事件
@@ -98,6 +101,14 @@ export interface FlashProgressEvent {
   phase: string;
   progress: number;
   message: string;
+}
+
+// 固件文件信息
+export interface FirmwareFileInfo {
+  path: string;
+  size: number;
+  modified: number | null;  // Unix timestamp in seconds
+  exists: boolean;
 }
 
 // Pack信息

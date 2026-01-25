@@ -18,6 +18,7 @@ export function FlashContent() {
     progress,
     message,
     firmwarePath,
+    firmwareSize,
     verifyAfterFlash,
     resetAfterFlash,
     useCustomAddress,
@@ -178,12 +179,18 @@ export function FlashContent() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-sm">
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between mb-1">
                 <span className="text-muted-foreground">固件文件</span>
                 <span className="font-mono text-xs max-w-[150px] truncate">
                   {firmwarePath ? firmwarePath.split(/[\\/]/).pop() : "未选择"}
                 </span>
               </div>
+              {firmwarePath && firmwareSize > 0 && (
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">文件大小</span>
+                  <span className="font-mono text-xs">{formatBytes(firmwareSize)}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">烧录后校验</span>
